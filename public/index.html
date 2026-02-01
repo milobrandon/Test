@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antarctic Penguin Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Antarctic Penguin Tracker</h1>
+            <p class="subtitle">Track and monitor penguin movements across Antarctica</p>
+        </header>
+
+        <div class="main-content">
+            <aside class="sidebar">
+                <div class="stats-panel">
+                    <h2>Statistics</h2>
+                    <div class="stats-grid" id="stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-value" id="total-penguins">0</span>
+                            <span class="stat-label">Total Penguins</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value" id="total-movements">0</span>
+                            <span class="stat-label">Recorded Movements</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="penguin-panel">
+                    <div class="panel-header">
+                        <h2>Penguins</h2>
+                        <button class="btn btn-primary" onclick="showAddPenguinModal()">+ Add</button>
+                    </div>
+                    <div class="penguin-list" id="penguin-list">
+                        <p class="empty-state">No penguins tracked yet</p>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="map-container">
+                <div id="map"></div>
+                <div class="map-controls">
+                    <button class="btn btn-secondary" onclick="centerOnAntarctica()">Center Map</button>
+                    <button class="btn btn-secondary" onclick="toggleAllPaths()">Toggle Paths</button>
+                </div>
+            </main>
+
+            <aside class="details-panel" id="details-panel">
+                <div class="panel-placeholder">
+                    <p>Select a penguin to view details</p>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Add Penguin Modal -->
+    <div class="modal" id="add-penguin-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New Penguin</h2>
+                <button class="modal-close" onclick="closeModal('add-penguin-modal')">&times;</button>
+            </div>
+            <form id="add-penguin-form" onsubmit="addPenguin(event)">
+                <div class="form-group">
+                    <label for="penguin-name">Name</label>
+                    <input type="text" id="penguin-name" required placeholder="e.g., Waddles">
+                </div>
+                <div class="form-group">
+                    <label for="penguin-species">Species</label>
+                    <select id="penguin-species" required>
+                        <option value="">Select species</option>
+                        <option value="Emperor">Emperor Penguin</option>
+                        <option value="Adelie">Adelie Penguin</option>
+                        <option value="Chinstrap">Chinstrap Penguin</option>
+                        <option value="Gentoo">Gentoo Penguin</option>
+                        <option value="King">King Penguin</option>
+                        <option value="Macaroni">Macaroni Penguin</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="penguin-colony">Colony</label>
+                    <input type="text" id="penguin-colony" placeholder="e.g., Ross Island">
+                </div>
+                <div class="form-group">
+                    <label for="penguin-tag">Tag ID (optional)</label>
+                    <input type="text" id="penguin-tag" placeholder="Auto-generated if empty">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('add-penguin-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Penguin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Movement Modal -->
+    <div class="modal" id="add-movement-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Record Movement</h2>
+                <button class="modal-close" onclick="closeModal('add-movement-modal')">&times;</button>
+            </div>
+            <form id="add-movement-form" onsubmit="addMovement(event)">
+                <input type="hidden" id="movement-penguin-id">
+                <p class="movement-penguin-name" id="movement-penguin-name"></p>
+                <div class="form-group">
+                    <label for="movement-lat">Latitude</label>
+                    <input type="number" id="movement-lat" required step="any" min="-90" max="-60" placeholder="-70.0">
+                </div>
+                <div class="form-group">
+                    <label for="movement-lng">Longitude</label>
+                    <input type="number" id="movement-lng" required step="any" min="-180" max="180" placeholder="0.0">
+                </div>
+                <div class="form-group">
+                    <label for="movement-notes">Notes (optional)</label>
+                    <textarea id="movement-notes" rows="3" placeholder="Observations..."></textarea>
+                </div>
+                <p class="form-hint">Click on the map to set coordinates</p>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('add-movement-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Record Movement</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
