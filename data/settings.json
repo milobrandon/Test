@@ -1,0 +1,19 @@
+{
+  "businessName": "My Business",
+  "defaultCalendarProvider": "google",
+  "defaultCalendarId": "",
+  "defaultDuration": 60,
+  "bufferMinutes": 15,
+  "businessHours": {
+    "start": "08:00",
+    "end": "18:00",
+    "timezone": "America/New_York",
+    "workDays": [1, 2, 3, 4, 5]
+  },
+  "enabledProviders": ["google", "microsoft", "caldav"],
+  "enabledServicePlatforms": [],
+  "notifications": {
+    "emailOnBooking": true,
+    "emailOnCancellation": true
+  }
+}

@@ -1,419 +1,728 @@
-// API Base URL
-const API_URL = '/api';
+// ─── Synthflow Calendar Booking — Frontend ──────────────────
+const API = '/api';
+let currentPage = 'dashboard';
 
-// State
-let penguins = [];
-let movements = [];
-let selectedPenguin = null;
-let map = null;
-let markers = {};
-let paths = {};
-let showPaths = true;
-
-// Initialize the application
+// ─── Bootstrap ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    initMap();
-    loadPenguins();
-    loadStats();
+  initNav();
+  navigate('dashboard');
+  createToastContainer();
 });
 
-// Initialize Leaflet map centered on Antarctica
-function initMap() {
-    map = L.map('map', {
-        center: [-75, 0],
-        zoom: 3,
-        minZoom: 2,
-        maxZoom: 10
+function createToastContainer() {
+  if (!document.querySelector('.toast-container')) {
+    const el = document.createElement('div');
+    el.className = 'toast-container';
+    document.body.appendChild(el);
+  }
+}
+
+// ─── Navigation ─────────────────────────────────────────────
+function initNav() {
+  document.querySelectorAll('.nav-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      navigate(item.dataset.page);
     });
-
-    // Add OpenStreetMap tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
-
-    // Add Antarctica outline circle for reference
-    L.circle([-90, 0], {
-        color: '#57c5b6',
-        fillColor: '#e8f4f8',
-        fillOpacity: 0.3,
-        radius: 2500000
-    }).addTo(map);
-
-    // Map click handler for setting movement coordinates
-    map.on('click', (e) => {
-        const modal = document.getElementById('add-movement-modal');
-        if (modal.classList.contains('active')) {
-            document.getElementById('movement-lat').value = e.latlng.lat.toFixed(6);
-            document.getElementById('movement-lng').value = e.latlng.lng.toFixed(6);
-        }
-    });
+  });
 }
 
-// Center map on Antarctica
-function centerOnAntarctica() {
-    map.setView([-75, 0], 3);
+function navigate(page) {
+  currentPage = page;
+  document.querySelectorAll('.nav-item').forEach((el) => {
+    el.classList.toggle('active', el.dataset.page === page);
+  });
+  const titles = {
+    dashboard: 'Dashboard',
+    bookings: 'Bookings',
+    calendars: 'Calendars',
+    webhooks: 'Webhooks',
+    platforms: 'Service Platforms',
+    settings: 'Settings',
+  };
+  document.getElementById('page-title').textContent = titles[page] || page;
+  document.getElementById('new-booking-btn').style.display =
+    page === 'dashboard' || page === 'bookings' ? '' : 'none';
+  renderPage(page);
 }
 
-// Toggle movement paths visibility
-function toggleAllPaths() {
-    showPaths = !showPaths;
-    Object.values(paths).forEach(path => {
-        if (showPaths) {
-            path.addTo(map);
-        } else {
-            path.remove();
-        }
-    });
+async function renderPage(page) {
+  const el = document.getElementById('content');
+  switch (page) {
+    case 'dashboard':
+      return renderDashboard(el);
+    case 'bookings':
+      return renderBookings(el);
+    case 'calendars':
+      return renderCalendars(el);
+    case 'webhooks':
+      return renderWebhooks(el);
+    case 'platforms':
+      return renderPlatforms(el);
+    case 'settings':
+      return renderSettings(el);
+    default:
+      el.innerHTML = '<p>Page not found</p>';
+  }
 }
 
-// Load all penguins
-async function loadPenguins() {
-    try {
-        const response = await fetch(`${API_URL}/penguins`);
-        penguins = await response.json();
-        renderPenguinList();
-        updateMapMarkers();
-    } catch (error) {
-        console.error('Error loading penguins:', error);
-    }
-}
+// ─── Dashboard ──────────────────────────────────────────────
+async function renderDashboard(el) {
+  el.innerHTML = '<p style="color:var(--text-light)">Loading...</p>';
 
-// Load statistics
-async function loadStats() {
-    try {
-        const response = await fetch(`${API_URL}/stats`);
-        const stats = await response.json();
-        document.getElementById('total-penguins').textContent = stats.totalPenguins;
-        document.getElementById('total-movements').textContent = stats.totalMovements;
-    } catch (error) {
-        console.error('Error loading stats:', error);
-    }
-}
+  const [stats, bookings] = await Promise.all([
+    fetchJSON('/api/stats'),
+    fetchJSON('/api/bookings'),
+  ]);
 
-// Render penguin list in sidebar
-function renderPenguinList() {
-    const container = document.getElementById('penguin-list');
+  const recent = (bookings || []).slice(0, 8);
 
-    if (penguins.length === 0) {
-        container.innerHTML = '<p class="empty-state">No penguins tracked yet</p>';
-        return;
-    }
+  el.innerHTML = `
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value">${stats.totalBookings || 0}</div>
+        <div class="stat-label">Total Bookings</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">${stats.confirmedBookings || 0}</div>
+        <div class="stat-label">Confirmed</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value">${stats.todayBookings || 0}</div>
+        <div class="stat-label">Today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${stats.voiceBookings || 0}</div>
+        <div class="stat-label">Voice AI Bookings</div>
+      </div>
+      <div class="stat-card teal">
+        <div class="stat-value">${stats.connectedCalendars || 0}</div>
+        <div class="stat-label">Calendars</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-value">${stats.cancelledBookings || 0}</div>
+        <div class="stat-label">Cancelled</div>
+      </div>
+    </div>
 
-    container.innerHTML = penguins.map(penguin => `
-        <div class="penguin-card ${selectedPenguin?.id === penguin.id ? 'active' : ''}"
-             onclick="selectPenguin('${penguin.id}')">
-            <div class="penguin-card-header">
-                <span class="penguin-icon">${getSpeciesEmoji(penguin.species)}</span>
-                <div class="penguin-info">
-                    <h3>${penguin.name}</h3>
-                    <span class="species">${penguin.species} Penguin</span>
-                </div>
-            </div>
-            <div class="penguin-status">
-                <span class="status-dot ${penguin.currentLocation ? '' : 'inactive'}"></span>
-                ${penguin.currentLocation ? 'Location tracked' : 'No location data'}
-            </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <h2>Recent Bookings</h2>
+          <button class="btn btn-sm btn-secondary" onclick="navigate('bookings')">View All</button>
         </div>
-    `).join('');
-}
-
-// Get emoji for penguin species
-function getSpeciesEmoji(species) {
-    return '🐧';
-}
-
-// Update map markers for all penguins
-function updateMapMarkers() {
-    // Clear existing markers
-    Object.values(markers).forEach(marker => marker.remove());
-    markers = {};
-
-    penguins.forEach(penguin => {
-        if (penguin.currentLocation) {
-            const marker = L.marker([
-                penguin.currentLocation.latitude,
-                penguin.currentLocation.longitude
-            ], {
-                title: penguin.name
-            }).addTo(map);
-
-            marker.bindPopup(`
-                <div class="penguin-popup">
-                    <h4>${getSpeciesEmoji(penguin.species)} ${penguin.name}</h4>
-                    <p>${penguin.species} Penguin</p>
-                    <p>Colony: ${penguin.colony}</p>
-                </div>
-            `);
-
-            marker.on('click', () => selectPenguin(penguin.id));
-            markers[penguin.id] = marker;
-        }
-    });
-}
-
-// Select a penguin and show details
-async function selectPenguin(id) {
-    const penguin = penguins.find(p => p.id === id);
-    if (!penguin) return;
-
-    selectedPenguin = penguin;
-    renderPenguinList();
-
-    // Load movements for this penguin
-    try {
-        const response = await fetch(`${API_URL}/penguins/${id}/movements`);
-        const penguinMovements = await response.json();
-        renderPenguinDetails(penguin, penguinMovements);
-        renderPenguinPath(penguin, penguinMovements);
-
-        // Center map on penguin if it has a location
-        if (penguin.currentLocation) {
-            map.setView([
-                penguin.currentLocation.latitude,
-                penguin.currentLocation.longitude
-            ], 5);
-
-            // Open popup
-            if (markers[id]) {
-                markers[id].openPopup();
-            }
-        }
-    } catch (error) {
-        console.error('Error loading movements:', error);
-    }
-}
-
-// Render penguin details panel
-function renderPenguinDetails(penguin, movements) {
-    const panel = document.getElementById('details-panel');
-
-    panel.innerHTML = `
-        <div class="penguin-details">
-            <div class="penguin-details-header">
-                <div class="icon">${getSpeciesEmoji(penguin.species)}</div>
-                <h2>${penguin.name}</h2>
-                <p class="species">${penguin.species} Penguin</p>
-            </div>
-
-            <div class="details-section">
-                <h3>Information</h3>
-                <div class="detail-row">
-                    <span class="detail-label">Tag ID</span>
-                    <span class="detail-value">${penguin.tagId}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Colony</span>
-                    <span class="detail-value">${penguin.colony}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">First Tracked</span>
-                    <span class="detail-value">${formatDate(penguin.createdAt)}</span>
-                </div>
-            </div>
-
-            ${penguin.currentLocation ? `
-                <div class="details-section">
-                    <h3>Current Location</h3>
-                    <div class="detail-row">
-                        <span class="detail-label">Latitude</span>
-                        <span class="detail-value">${penguin.currentLocation.latitude.toFixed(4)}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Longitude</span>
-                        <span class="detail-value">${penguin.currentLocation.longitude.toFixed(4)}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Updated</span>
-                        <span class="detail-value">${formatDate(penguin.currentLocation.updatedAt)}</span>
-                    </div>
-                </div>
-            ` : ''}
-
-            <div class="details-section">
-                <h3>Movement History (${movements.length})</h3>
-                <div class="movement-list">
-                    ${movements.length > 0 ? movements.map(m => `
-                        <div class="movement-item">
-                            <div class="coords">${m.latitude.toFixed(4)}, ${m.longitude.toFixed(4)}</div>
-                            <div class="time">${formatDateTime(m.timestamp)}</div>
-                            ${m.notes ? `<div class="notes">${m.notes}</div>` : ''}
-                        </div>
-                    `).join('') : '<p class="empty-state">No movements recorded</p>'}
-                </div>
-            </div>
-
-            <div class="details-actions">
-                <button class="btn btn-primary btn-block" onclick="showAddMovementModal('${penguin.id}', '${penguin.name}')">
-                    Record Movement
-                </button>
-                <button class="btn btn-danger btn-block" onclick="deletePenguin('${penguin.id}')">
-                    Delete Penguin
-                </button>
-            </div>
+        <div class="table-wrap">
+          ${recent.length ? renderBookingTable(recent) : `
+            <div class="empty-state">
+              <div class="empty-state-icon">&#128197;</div>
+              <h3>No bookings yet</h3>
+              <p>Bookings from Synthflow voice calls will appear here automatically.</p>
+            </div>`}
         </div>
-    `;
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Quick Setup</h2></div>
+        <div class="card-body">
+          <div class="setup-steps">
+            <div class="setup-step">
+              <div class="step-number">1</div>
+              <div class="step-content">
+                <h3>Connect a Calendar</h3>
+                <p>Link Google Calendar, Microsoft Outlook, or Apple Calendar to receive bookings.</p>
+              </div>
+            </div>
+            <div class="setup-step">
+              <div class="step-number">2</div>
+              <div class="step-content">
+                <h3>Configure Synthflow Webhook</h3>
+                <p>Copy the webhook URL and paste it into your Synthflow agent's configuration.</p>
+              </div>
+            </div>
+            <div class="setup-step">
+              <div class="step-number">3</div>
+              <div class="step-content">
+                <h3>Set Business Hours</h3>
+                <p>Define your availability window so the AI agent only books during working hours.</p>
+              </div>
+            </div>
+            <div class="setup-step">
+              <div class="step-number">4</div>
+              <div class="step-content">
+                <h3>Connect Service Platforms</h3>
+                <p>Optionally link ServiceTitan, Housecall Pro, or Jobber to sync jobs automatically.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
 }
 
-// Render movement path on map
-function renderPenguinPath(penguin, movements) {
-    // Remove existing path for this penguin
-    if (paths[penguin.id]) {
-        paths[penguin.id].remove();
+// ─── Bookings ───────────────────────────────────────────────
+async function renderBookings(el) {
+  el.innerHTML = '<p style="color:var(--text-light)">Loading bookings...</p>';
+  const bookings = await fetchJSON('/api/bookings');
+
+  if (!bookings || bookings.length === 0) {
+    el.innerHTML = `
+      <div class="card">
+        <div class="empty-state">
+          <div class="empty-state-icon">&#128197;</div>
+          <h3>No bookings yet</h3>
+          <p>Create a manual booking or let your Synthflow voice agent create one automatically.</p>
+        </div>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h2>All Bookings (${bookings.length})</h2>
+        <div style="display:flex;gap:8px;">
+          <select id="filter-status" onchange="filterBookings()" style="padding:5px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;">
+            <option value="">All Statuses</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="pending_calendar">Pending</option>
+          </select>
+          <select id="filter-source" onchange="filterBookings()" style="padding:5px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;">
+            <option value="">All Sources</option>
+            <option value="synthflow">Voice AI</option>
+            <option value="manual">Manual</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap" id="bookings-table-wrap">
+        ${renderBookingTable(bookings, true)}
+      </div>
+    </div>`;
+}
+
+function renderBookingTable(bookings, showActions = false) {
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Service</th>
+          <th>Date & Time</th>
+          <th>Source</th>
+          <th>Status</th>
+          ${showActions ? '<th>Actions</th>' : ''}
+        </tr>
+      </thead>
+      <tbody>
+        ${bookings.map((b) => `
+          <tr>
+            <td>
+              <strong>${esc(b.customerName)}</strong><br>
+              <small style="color:var(--text-light)">${esc(b.customerPhone)}</small>
+            </td>
+            <td>${esc(b.serviceType || '—')}</td>
+            <td>${formatDate(b.date)}<br><small style="color:var(--text-light)">${formatTime(b.startTime)}</small></td>
+            <td><span class="badge badge-${b.source === 'synthflow' ? 'voice' : 'manual'}">${b.source === 'synthflow' ? 'Voice AI' : 'Manual'}</span></td>
+            <td><span class="badge badge-${b.status}">${capitalize(b.status)}</span></td>
+            ${showActions ? `<td>
+              ${b.status === 'confirmed' ? `<button class="btn btn-sm btn-danger" onclick="cancelBooking('${b.id}')">Cancel</button>` : ''}
+            </td>` : ''}
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function filterBookings() {
+  const status = document.getElementById('filter-status').value;
+  const source = document.getElementById('filter-source').value;
+  let url = '/api/bookings?';
+  if (status) url += `status=${status}&`;
+  if (source) url += `source=${source}&`;
+  const bookings = await fetchJSON(url);
+  document.getElementById('bookings-table-wrap').innerHTML = renderBookingTable(bookings || [], true);
+}
+
+async function cancelBooking(id) {
+  if (!confirm('Cancel this booking? The calendar event will also be removed.')) return;
+  const res = await fetchJSON(`/api/bookings/${id}/cancel`, { method: 'POST' });
+  if (res) {
+    toast('Booking cancelled', 'success');
+    renderPage(currentPage);
+  }
+}
+
+// ─── Calendars ──────────────────────────────────────────────
+async function renderCalendars(el) {
+  el.innerHTML = '<p style="color:var(--text-light)">Loading calendars...</p>';
+  const calendars = await fetchJSON('/api/calendars');
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header"><h2>Connect a Calendar Provider</h2></div>
+      <div class="card-body">
+        <div class="provider-grid">
+          <div class="provider-card ${hasProvider(calendars, 'google') ? 'connected' : ''}">
+            <div class="provider-icon google">G</div>
+            <h3>Google Calendar</h3>
+            <p>Connect your Google account to sync bookings with Google Calendar.</p>
+            <a href="/auth/google" class="btn btn-primary btn-sm">Connect Google</a>
+            ${hasProvider(calendars, 'google') ? '<div class="provider-status connected">Connected</div>' : ''}
+          </div>
+          <div class="provider-card ${hasProvider(calendars, 'microsoft') ? 'connected' : ''}">
+            <div class="provider-icon microsoft">M</div>
+            <h3>Microsoft Outlook</h3>
+            <p>Connect your Microsoft 365 or Outlook account for calendar sync.</p>
+            <a href="/auth/microsoft" class="btn btn-primary btn-sm">Connect Outlook</a>
+            ${hasProvider(calendars, 'microsoft') ? '<div class="provider-status connected">Connected</div>' : ''}
+          </div>
+          <div class="provider-card ${hasProvider(calendars, 'caldav') ? 'connected' : ''}">
+            <div class="provider-icon caldav">C</div>
+            <h3>Apple / CalDAV</h3>
+            <p>Connect iCloud Calendar, FastMail, or any CalDAV-compatible server.</p>
+            <button class="btn btn-primary btn-sm" onclick="connectCalDAV()">Connect CalDAV</button>
+            ${hasProvider(calendars, 'caldav') ? '<div class="provider-status connected">Connected</div>' : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Connected Calendars</h2></div>
+      <div class="card-body">
+        ${calendars && calendars.length ? calendars.map((cal) => `
+          <div class="cal-list-item">
+            <div class="cal-info">
+              <div class="cal-dot" style="background:${providerColor(cal.provider)}"></div>
+              <div>
+                <strong>${esc(cal.name)}</strong>
+                <div style="font-size:12px;color:var(--text-light)">${capitalize(cal.provider)}${cal.isDefault ? ' &mdash; Default' : ''}</div>
+              </div>
+            </div>
+            <div class="cal-actions">
+              ${!cal.isDefault ? `<button class="btn btn-sm btn-secondary" onclick="setDefaultCalendar('${cal.id}')">Set Default</button>` : '<span class="badge badge-confirmed">Default</span>'}
+              <button class="btn btn-sm btn-danger" onclick="disconnectCalendar('${cal.id}')">Disconnect</button>
+            </div>
+          </div>`).join('') : '<div class="empty-state"><h3>No calendars connected</h3><p>Connect a calendar provider above to start receiving bookings.</p></div>'}
+      </div>
+    </div>`;
+}
+
+function hasProvider(calendars, provider) {
+  return calendars && calendars.some((c) => c.provider === provider);
+}
+
+function providerColor(provider) {
+  const colors = { google: '#4285f4', microsoft: '#00a4ef', caldav: '#333' };
+  return colors[provider] || '#6c5ce7';
+}
+
+async function connectCalDAV() {
+  const res = await fetchJSON('/auth/caldav/connect', { method: 'POST' });
+  if (res && res.success) {
+    toast('CalDAV connected', 'success');
+    renderPage('calendars');
+  } else {
+    toast('CalDAV connection failed. Check server credentials in .env', 'error');
+  }
+}
+
+async function setDefaultCalendar(id) {
+  await fetchJSON(`/api/calendars/${id}/default`, { method: 'PUT' });
+  toast('Default calendar updated', 'success');
+  renderPage('calendars');
+}
+
+async function disconnectCalendar(id) {
+  if (!confirm('Disconnect this calendar?')) return;
+  await fetchJSON(`/api/calendars/${id}`, { method: 'DELETE' });
+  toast('Calendar disconnected', 'success');
+  renderPage('calendars');
+}
+
+// ─── Webhooks ───────────────────────────────────────────────
+async function renderWebhooks(el) {
+  const [urls, logs] = await Promise.all([
+    fetchJSON('/api/webhook-url'),
+    fetchJSON('/webhooks/logs'),
+  ]);
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header"><h2>Synthflow Webhook URLs</h2></div>
+      <div class="card-body">
+        <p style="margin-bottom:12px;font-size:14px;color:var(--text-light)">
+          Copy these URLs and paste them into your <strong>Synthflow agent's webhook configuration</strong>.
+        </p>
+        <div style="margin-bottom:16px;">
+          <label style="font-size:13px;font-weight:500;display:block;margin-bottom:6px;">Booking Webhook (call completed)</label>
+          <div class="webhook-url-box">
+            <code id="webhook-booking-url">${urls ? esc(urls.booking) : 'Loading...'}</code>
+            <button class="copy-btn" onclick="copyText('webhook-booking-url')">Copy</button>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:13px;font-weight:500;display:block;margin-bottom:6px;">Availability Webhook (live call lookup)</label>
+          <div class="webhook-url-box">
+            <code id="webhook-avail-url">${urls ? esc(urls.availability) : 'Loading...'}</code>
+            <button class="copy-btn" onclick="copyText('webhook-avail-url')">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header"><h2>How It Works</h2></div>
+      <div class="card-body">
+        <div class="setup-steps">
+          <div class="setup-step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h3>Voice Agent Receives a Call</h3>
+              <p>Your Synthflow agent answers the phone and collects booking details from the caller (name, service, date, time).</p>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h3>Synthflow Sends Webhook</h3>
+              <p>When the call ends, Synthflow posts the extracted data to your Booking Webhook URL.</p>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h3>Availability Check & Calendar Event</h3>
+              <p>This app checks your connected calendars for conflicts, picks the best slot, and creates the event automatically.</p>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <h3>Confirmation Sent Back</h3>
+              <p>A booking confirmation is sent back to Synthflow and recorded in your dashboard.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Recent Webhook Events</h2></div>
+      <div>
+        ${logs && logs.length ? logs.map((log) => `
+          <div class="log-entry">
+            <div class="log-dot ${log.event === 'call.completed' ? 'success' : 'info'}"></div>
+            <span class="log-time">${formatDateTime(log.timestamp)}</span>
+            <span class="log-message"><strong>${esc(log.event)}</strong> &mdash; Call ${esc(log.callId || 'N/A')}</span>
+          </div>`).join('') : '<div class="empty-state"><h3>No webhook events yet</h3><p>Events will appear here when Synthflow sends data to your webhook.</p></div>'}
+      </div>
+    </div>`;
+}
+
+function copyText(elementId) {
+  const text = document.getElementById(elementId).textContent;
+  navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard', 'success'));
+}
+
+// ─── Service Platforms ──────────────────────────────────────
+async function renderPlatforms(el) {
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header">
+        <h2>Field Service Platform Integrations</h2>
+        <button class="btn btn-sm btn-secondary" onclick="testAllProviders()">Test All Connections</button>
+      </div>
+      <div class="card-body">
+        <p style="margin-bottom:20px;font-size:14px;color:var(--text-light)">
+          Connect your field service management platform to automatically create jobs and sync customer data when bookings come in.
+        </p>
+        <div class="provider-grid">
+          <div class="provider-card">
+            <div class="provider-icon servicetitan">ST</div>
+            <h3>ServiceTitan</h3>
+            <p>Sync bookings as jobs and manage customers directly in ServiceTitan.</p>
+            <button class="btn btn-sm btn-secondary" disabled>Coming Soon</button>
+            <div class="provider-status not-connected">Configure in .env</div>
+          </div>
+          <div class="provider-card">
+            <div class="provider-icon housecallpro">HC</div>
+            <h3>Housecall Pro</h3>
+            <p>Push bookings to Housecall Pro for dispatch and technician assignment.</p>
+            <button class="btn btn-sm btn-secondary" disabled>Coming Soon</button>
+            <div class="provider-status not-connected">Configure in .env</div>
+          </div>
+          <div class="provider-card">
+            <div class="provider-icon jobber">J</div>
+            <h3>Jobber</h3>
+            <p>Create quotes and jobs in Jobber automatically from voice bookings.</p>
+            <button class="btn btn-sm btn-secondary" disabled>Coming Soon</button>
+            <div class="provider-status not-connected">Configure in .env</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Integration Roadmap</h2></div>
+      <div class="card-body">
+        <div class="setup-steps">
+          <div class="setup-step">
+            <div class="step-number" style="background:var(--success)">&#10003;</div>
+            <div class="step-content">
+              <h3>Calendar Providers</h3>
+              <p>Google Calendar, Microsoft Outlook, Apple/CalDAV &mdash; Available now.</p>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="step-number" style="background:var(--warning);color:var(--text)">~</div>
+            <div class="step-content">
+              <h3>ServiceTitan</h3>
+              <p>Job creation, customer lookup, technician dispatch. Provider ready &mdash; add your API keys in .env to enable.</p>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="step-number" style="background:var(--warning);color:var(--text)">~</div>
+            <div class="step-content">
+              <h3>Housecall Pro</h3>
+              <p>Job creation, customer management, scheduling. Provider ready &mdash; add your API key in .env to enable.</p>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="step-number" style="background:var(--warning);color:var(--text)">~</div>
+            <div class="step-content">
+              <h3>Jobber</h3>
+              <p>GraphQL-based integration for jobs and clients. Provider ready &mdash; add your credentials in .env to enable.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="provider-test-results"></div>`;
+}
+
+async function testAllProviders() {
+  const resultsEl = document.getElementById('provider-test-results');
+  resultsEl.innerHTML = '<p style="padding:16px;color:var(--text-light)">Testing connections...</p>';
+  const results = await fetchJSON('/api/settings/providers/test', { method: 'POST' });
+  if (results) {
+    resultsEl.innerHTML = `<div class="card" style="margin-top:20px;"><div class="card-header"><h2>Connection Results</h2></div><div class="card-body"><pre style="font-size:13px;white-space:pre-wrap;">${JSON.stringify(results, null, 2)}</pre></div></div>`;
+  }
+}
+
+// ─── Settings ───────────────────────────────────────────────
+async function renderSettings(el) {
+  const settings = await fetchJSON('/api/settings');
+  if (!settings) {
+    el.innerHTML = '<p>Failed to load settings.</p>';
+    return;
+  }
+
+  const bh = settings.businessHours || {};
+
+  el.innerHTML = `
+    <form onsubmit="saveSettings(event)" id="settings-form">
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><h2>General</h2></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Business Name</label>
+              <input type="text" name="businessName" value="${esc(settings.businessName || '')}">
+            </div>
+            <div class="form-group">
+              <label>Default Calendar Provider</label>
+              <select name="defaultCalendarProvider">
+                <option value="google" ${settings.defaultCalendarProvider === 'google' ? 'selected' : ''}>Google Calendar</option>
+                <option value="microsoft" ${settings.defaultCalendarProvider === 'microsoft' ? 'selected' : ''}>Microsoft Outlook</option>
+                <option value="caldav" ${settings.defaultCalendarProvider === 'caldav' ? 'selected' : ''}>CalDAV</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><h2>Booking Defaults</h2></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Default Duration (minutes)</label>
+              <input type="number" name="defaultDuration" value="${settings.defaultDuration || 60}" min="15" step="15">
+            </div>
+            <div class="form-group">
+              <label>Buffer Between Appointments (minutes)</label>
+              <input type="number" name="bufferMinutes" value="${settings.bufferMinutes || 15}" min="0" step="5">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><h2>Business Hours</h2></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Start Time</label>
+              <input type="time" name="bhStart" value="${bh.start || '08:00'}">
+            </div>
+            <div class="form-group">
+              <label>End Time</label>
+              <input type="time" name="bhEnd" value="${bh.end || '18:00'}">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Timezone</label>
+              <input type="text" name="bhTimezone" value="${esc(bh.timezone || 'America/New_York')}">
+            </div>
+            <div class="form-group">
+              <label>Work Days (comma-separated: 1=Mon ... 7=Sun)</label>
+              <input type="text" name="bhWorkDays" value="${(bh.workDays || [1,2,3,4,5]).join(',')}">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;">
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+      </div>
+    </form>`;
+}
+
+async function saveSettings(e) {
+  e.preventDefault();
+  const form = document.getElementById('settings-form');
+  const fd = new FormData(form);
+
+  const settings = {
+    businessName: fd.get('businessName'),
+    defaultCalendarProvider: fd.get('defaultCalendarProvider'),
+    defaultDuration: parseInt(fd.get('defaultDuration'), 10),
+    bufferMinutes: parseInt(fd.get('bufferMinutes'), 10),
+    businessHours: {
+      start: fd.get('bhStart'),
+      end: fd.get('bhEnd'),
+      timezone: fd.get('bhTimezone'),
+      workDays: fd.get('bhWorkDays').split(',').map(Number),
+    },
+  };
+
+  const res = await fetchJSON('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+  if (res) toast('Settings saved', 'success');
+}
+
+// ─── New Booking Modal ──────────────────────────────────────
+function showNewBookingModal() {
+  document.getElementById('booking-form').reset();
+  // Set default date to today
+  const today = new Date().toISOString().split('T')[0];
+  document.querySelector('[name="date"]').value = today;
+  document.getElementById('modal-overlay').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('active');
+}
+
+async function submitBooking(e) {
+  e.preventDefault();
+  const form = document.getElementById('booking-form');
+  const fd = new FormData(form);
+
+  const duration = parseInt(fd.get('duration'), 10) || 60;
+  const startTime = fd.get('startTime');
+  const date = fd.get('date');
+
+  // Build ISO start/end times
+  const start = new Date(`${date}T${startTime}`);
+  const end = new Date(start.getTime() + duration * 60000);
+
+  const booking = {
+    customerName: fd.get('customerName'),
+    customerPhone: fd.get('customerPhone'),
+    customerEmail: fd.get('customerEmail'),
+    serviceType: fd.get('serviceType'),
+    date,
+    startTime: start.toISOString(),
+    endTime: end.toISOString(),
+    duration,
+    urgency: fd.get('urgency'),
+    address: fd.get('address'),
+    notes: fd.get('notes'),
+  };
+
+  const res = await fetchJSON('/api/bookings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(booking),
+  });
+
+  if (res) {
+    closeModal();
+    toast('Booking created', 'success');
+    renderPage(currentPage);
+  }
+}
+
+// ─── Helpers ────────────────────────────────────────────────
+async function fetchJSON(url, opts = {}) {
+  try {
+    const res = await fetch(url, opts);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      toast(err.error || 'Request failed', 'error');
+      return null;
     }
-
-    if (movements.length < 2) return;
-
-    // Sort movements by timestamp (oldest first)
-    const sortedMovements = [...movements].sort((a, b) =>
-        new Date(a.timestamp) - new Date(b.timestamp)
-    );
-
-    const coordinates = sortedMovements.map(m => [m.latitude, m.longitude]);
-
-    const path = L.polyline(coordinates, {
-        color: '#1a5f7a',
-        weight: 2,
-        opacity: 0.7,
-        dashArray: '5, 10'
-    });
-
-    if (showPaths) {
-        path.addTo(map);
-    }
-
-    paths[penguin.id] = path;
+    return res.json();
+  } catch (err) {
+    console.error('Fetch error:', err);
+    toast('Network error', 'error');
+    return null;
+  }
 }
 
-// Format date
-function formatDate(dateString) {
-    return new Date(dateString).toLocaleDateString();
+function esc(str) {
+  if (!str) return '';
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
 }
 
-// Format date and time
-function formatDateTime(dateString) {
-    return new Date(dateString).toLocaleString();
+function capitalize(str) {
+  if (!str) return '';
+  return str.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Show add penguin modal
-function showAddPenguinModal() {
-    document.getElementById('add-penguin-form').reset();
-    document.getElementById('add-penguin-modal').classList.add('active');
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// Show add movement modal
-function showAddMovementModal(penguinId, penguinName) {
-    document.getElementById('add-movement-form').reset();
-    document.getElementById('movement-penguin-id').value = penguinId;
-    document.getElementById('movement-penguin-name').textContent = `Recording movement for: ${penguinName}`;
-    document.getElementById('add-movement-modal').classList.add('active');
+function formatTime(timeStr) {
+  if (!timeStr) return '';
+  const d = new Date(timeStr);
+  if (isNaN(d)) return timeStr;
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-// Close modal
-function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('active');
+function formatDateTime(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  if (isNaN(d)) return str;
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-// Add a new penguin
-async function addPenguin(event) {
-    event.preventDefault();
-
-    const penguin = {
-        name: document.getElementById('penguin-name').value,
-        species: document.getElementById('penguin-species').value,
-        colony: document.getElementById('penguin-colony').value || undefined,
-        tagId: document.getElementById('penguin-tag').value || undefined
-    };
-
-    try {
-        const response = await fetch(`${API_URL}/penguins`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(penguin)
-        });
-
-        if (response.ok) {
-            closeModal('add-penguin-modal');
-            loadPenguins();
-            loadStats();
-        } else {
-            const error = await response.json();
-            alert(error.error || 'Failed to add penguin');
-        }
-    } catch (error) {
-        console.error('Error adding penguin:', error);
-        alert('Failed to add penguin');
-    }
-}
-
-// Add a movement record
-async function addMovement(event) {
-    event.preventDefault();
-
-    const penguinId = document.getElementById('movement-penguin-id').value;
-    const movement = {
-        latitude: parseFloat(document.getElementById('movement-lat').value),
-        longitude: parseFloat(document.getElementById('movement-lng').value),
-        notes: document.getElementById('movement-notes').value || undefined
-    };
-
-    try {
-        const response = await fetch(`${API_URL}/penguins/${penguinId}/movements`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(movement)
-        });
-
-        if (response.ok) {
-            closeModal('add-movement-modal');
-            loadPenguins();
-            loadStats();
-            selectPenguin(penguinId);
-        } else {
-            const error = await response.json();
-            alert(error.error || 'Failed to record movement');
-        }
-    } catch (error) {
-        console.error('Error recording movement:', error);
-        alert('Failed to record movement');
-    }
-}
-
-// Delete a penguin
-async function deletePenguin(id) {
-    if (!confirm('Are you sure you want to delete this penguin and all its tracking data?')) {
-        return;
-    }
-
-    try {
-        const response = await fetch(`${API_URL}/penguins/${id}`, {
-            method: 'DELETE'
-        });
-
-        if (response.ok) {
-            selectedPenguin = null;
-            document.getElementById('details-panel').innerHTML = `
-                <div class="panel-placeholder">
-                    <p>Select a penguin to view details</p>
-                </div>
-            `;
-
-            // Remove marker and path
-            if (markers[id]) {
-                markers[id].remove();
-                delete markers[id];
-            }
-            if (paths[id]) {
-                paths[id].remove();
-                delete paths[id];
-            }
-
-            loadPenguins();
-            loadStats();
-        } else {
-            alert('Failed to delete penguin');
-        }
-    } catch (error) {
-        console.error('Error deleting penguin:', error);
-        alert('Failed to delete penguin');
-    }
+function toast(message, type = 'info') {
+  const container = document.querySelector('.toast-container');
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = message;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
 }

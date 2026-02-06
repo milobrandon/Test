@@ -1,202 +1,65 @@
 const express = require('express');
 const cors = require('cors');
-const { v4: uuidv4 } = require('uuid');
-const fs = require('fs');
 const path = require('path');
+const config = require('./src/config');
+const errorHandler = require('./src/middleware/error-handler');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data', 'penguins.json');
 
-// Middleware
+// ── Middleware ──────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Ensure data directory exists
-if (!fs.existsSync(path.join(__dirname, 'data'))) {
-    fs.mkdirSync(path.join(__dirname, 'data'));
-}
+// ── API Routes ─────────────────────────────────────────────
+app.use('/webhooks', require('./src/routes/webhooks'));
+app.use('/auth', require('./src/routes/auth'));
+app.use('/api/bookings', require('./src/routes/bookings'));
+app.use('/api/calendars', require('./src/routes/calendars'));
+app.use('/api/settings', require('./src/routes/settings'));
 
-// Initialize data file if it doesn't exist
-if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ penguins: [], movements: [] }, null, 2));
-}
-
-// Helper functions
-function readData() {
-    const data = fs.readFileSync(DATA_FILE, 'utf8');
-    return JSON.parse(data);
-}
-
-function writeData(data) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
-// API Routes
-
-// Get all penguins
-app.get('/api/penguins', (req, res) => {
-    const data = readData();
-    res.json(data.penguins);
-});
-
-// Get a single penguin by ID
-app.get('/api/penguins/:id', (req, res) => {
-    const data = readData();
-    const penguin = data.penguins.find(p => p.id === req.params.id);
-    if (!penguin) {
-        return res.status(404).json({ error: 'Penguin not found' });
-    }
-    res.json(penguin);
-});
-
-// Create a new penguin
-app.post('/api/penguins', (req, res) => {
-    const data = readData();
-    const { name, species, tagId, colony } = req.body;
-
-    if (!name || !species) {
-        return res.status(400).json({ error: 'Name and species are required' });
-    }
-
-    const newPenguin = {
-        id: uuidv4(),
-        name,
-        species,
-        tagId: tagId || `TAG-${Date.now()}`,
-        colony: colony || 'Unknown',
-        currentLocation: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-
-    data.penguins.push(newPenguin);
-    writeData(data);
-    res.status(201).json(newPenguin);
-});
-
-// Update a penguin
-app.put('/api/penguins/:id', (req, res) => {
-    const data = readData();
-    const index = data.penguins.findIndex(p => p.id === req.params.id);
-
-    if (index === -1) {
-        return res.status(404).json({ error: 'Penguin not found' });
-    }
-
-    const { name, species, tagId, colony } = req.body;
-    data.penguins[index] = {
-        ...data.penguins[index],
-        name: name || data.penguins[index].name,
-        species: species || data.penguins[index].species,
-        tagId: tagId || data.penguins[index].tagId,
-        colony: colony || data.penguins[index].colony,
-        updatedAt: new Date().toISOString()
-    };
-
-    writeData(data);
-    res.json(data.penguins[index]);
-});
-
-// Delete a penguin
-app.delete('/api/penguins/:id', (req, res) => {
-    const data = readData();
-    const index = data.penguins.findIndex(p => p.id === req.params.id);
-
-    if (index === -1) {
-        return res.status(404).json({ error: 'Penguin not found' });
-    }
-
-    data.penguins.splice(index, 1);
-    // Also remove associated movements
-    data.movements = data.movements.filter(m => m.penguinId !== req.params.id);
-    writeData(data);
-    res.json({ message: 'Penguin deleted successfully' });
-});
-
-// Record a movement for a penguin
-app.post('/api/penguins/:id/movements', (req, res) => {
-    const data = readData();
-    const penguin = data.penguins.find(p => p.id === req.params.id);
-
-    if (!penguin) {
-        return res.status(404).json({ error: 'Penguin not found' });
-    }
-
-    const { latitude, longitude, notes } = req.body;
-
-    if (latitude === undefined || longitude === undefined) {
-        return res.status(400).json({ error: 'Latitude and longitude are required' });
-    }
-
-    const movement = {
-        id: uuidv4(),
-        penguinId: req.params.id,
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude),
-        notes: notes || '',
-        timestamp: new Date().toISOString()
-    };
-
-    // Update penguin's current location
-    const penguinIndex = data.penguins.findIndex(p => p.id === req.params.id);
-    data.penguins[penguinIndex].currentLocation = {
-        latitude: movement.latitude,
-        longitude: movement.longitude,
-        updatedAt: movement.timestamp
-    };
-    data.penguins[penguinIndex].updatedAt = movement.timestamp;
-
-    data.movements.push(movement);
-    writeData(data);
-    res.status(201).json(movement);
-});
-
-// Get movement history for a penguin
-app.get('/api/penguins/:id/movements', (req, res) => {
-    const data = readData();
-    const penguin = data.penguins.find(p => p.id === req.params.id);
-
-    if (!penguin) {
-        return res.status(404).json({ error: 'Penguin not found' });
-    }
-
-    const movements = data.movements
-        .filter(m => m.penguinId === req.params.id)
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-    res.json(movements);
-});
-
-// Get all movements (for map visualization)
-app.get('/api/movements', (req, res) => {
-    const data = readData();
-    res.json(data.movements);
-});
-
-// Get statistics
+// Stats shortcut
 app.get('/api/stats', (req, res) => {
-    const data = readData();
+  const store = require('./src/services/store');
+  const bookings = store.getBookings();
+  const calendars = store.getCalendars();
+  const today = new Date().toISOString().split('T')[0];
 
-    const speciesCount = {};
-    const colonyCount = {};
-
-    data.penguins.forEach(p => {
-        speciesCount[p.species] = (speciesCount[p.species] || 0) + 1;
-        colonyCount[p.colony] = (colonyCount[p.colony] || 0) + 1;
-    });
-
-    res.json({
-        totalPenguins: data.penguins.length,
-        totalMovements: data.movements.length,
-        speciesDistribution: speciesCount,
-        colonyDistribution: colonyCount
-    });
+  res.json({
+    totalBookings: bookings.length,
+    confirmedBookings: bookings.filter((b) => b.status === 'confirmed').length,
+    cancelledBookings: bookings.filter((b) => b.status === 'cancelled').length,
+    todayBookings: bookings.filter((b) => b.date === today).length,
+    voiceBookings: bookings.filter((b) => b.source === 'synthflow').length,
+    manualBookings: bookings.filter((b) => b.source === 'manual').length,
+    connectedCalendars: calendars.length,
+    calendarProviders: [...new Set(calendars.map((c) => c.provider))],
+  });
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`Penguin Tracker API running on http://localhost:${PORT}`);
-    console.log(`Open http://localhost:${PORT} in your browser to view the app`);
+// Webhook URL helper — shows the URL to paste into Synthflow
+app.get('/api/webhook-url', (req, res) => {
+  const base = config.appUrl;
+  res.json({
+    booking: `${base}/webhooks/synthflow`,
+    availability: `${base}/webhooks/synthflow/availability`,
+    instructions: 'Paste these URLs into your Synthflow agent\'s webhook configuration.',
+  });
+});
+
+// ── SPA fallback ───────────────────────────────────────────
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ── Error handler ──────────────────────────────────────────
+app.use(errorHandler);
+
+// ── Start ──────────────────────────────────────────────────
+app.listen(config.port, () => {
+  console.log(`\n  Synthflow Calendar Booking`);
+  console.log(`  ─────────────────────────`);
+  console.log(`  Dashboard   : http://localhost:${config.port}`);
+  console.log(`  Webhook URL : http://localhost:${config.port}/webhooks/synthflow`);
+  console.log(`  API Base    : http://localhost:${config.port}/api\n`);
 });
