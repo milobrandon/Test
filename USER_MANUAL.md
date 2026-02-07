@@ -1,6 +1,6 @@
-# Synthflow Calendar Booking — User Manual
+# Relay Systems — User Manual
 
-A step-by-step guide for setting up and using the Synthflow Voice AI Calendar Booking system. This application connects your Synthflow voice agents to your clients' calendars so that bookings are created automatically when customers call in.
+A step-by-step guide for setting up and using Relay Systems, a Voice AI Management Platform. This application connects voice AI agents to your clients' calendars so that bookings are created automatically when customers call in. It includes multi-tenant sub-accounts, role-based user management, call logging with customizable variables, and performance dashboards.
 
 ---
 
@@ -10,15 +10,19 @@ A step-by-step guide for setting up and using the Synthflow Voice AI Calendar Bo
 2. [Installing on Your Computer](#2-installing-on-your-computer)
 3. [Configuration (API Keys)](#3-configuration-api-keys)
 4. [Starting the Application](#4-starting-the-application)
-5. [The Admin Dashboard](#5-the-admin-dashboard)
-6. [Creating Your First Client Account](#6-creating-your-first-client-account)
-7. [Connecting a Calendar to an Account](#7-connecting-a-calendar-to-an-account)
-8. [Setting Up the Synthflow Webhook](#8-setting-up-the-synthflow-webhook)
-9. [Configuring Account Settings](#9-configuring-account-settings)
-10. [Managing Bookings](#10-managing-bookings)
-11. [Editing and Deleting Accounts](#11-editing-and-deleting-accounts)
-12. [Deploying to the Internet](#12-deploying-to-the-internet)
-13. [Frequently Asked Questions](#13-frequently-asked-questions)
+5. [First-Time Setup (Creating the Admin Account)](#5-first-time-setup)
+6. [The Admin Dashboard](#6-the-admin-dashboard)
+7. [User Management](#7-user-management)
+8. [Creating Your First Client Account](#8-creating-your-first-client-account)
+9. [Connecting a Calendar to an Account](#9-connecting-a-calendar-to-an-account)
+10. [Setting Up the Voice AI Webhook](#10-setting-up-the-voice-ai-webhook)
+11. [Call Logs and Variables](#11-call-logs-and-variables)
+12. [Configuring Account Settings](#12-configuring-account-settings)
+13. [Managing Bookings](#13-managing-bookings)
+14. [The Client Dashboard](#14-the-client-dashboard)
+15. [Editing and Deleting Accounts](#15-editing-and-deleting-accounts)
+16. [Deploying to the Internet](#16-deploying-to-the-internet)
+17. [Frequently Asked Questions](#17-frequently-asked-questions)
 
 ---
 
@@ -93,21 +97,25 @@ Before running the application, you need to set up a configuration file with you
 ```
 PORT=3000
 APP_URL=http://localhost:3000
+JWT_SECRET=your-secret-key-change-in-production
 ```
 
 - **PORT** — The port number the app runs on. Leave as `3000` unless that port is already in use.
 - **APP_URL** — The address of your application. Keep as `http://localhost:3000` for local use. When you deploy to the internet, change this to your actual domain (e.g., `https://booking.yourdomain.com`).
+- **JWT_SECRET** — A secret key used to sign authentication tokens. **Change this to a random string in production.** For local development the default works fine.
 
-### Synthflow Settings
+### Voice AI Platform Settings
 
 ```
-SYNTHFLOW_API_KEY=your_synthflow_api_key
-SYNTHFLOW_WEBHOOK_SECRET=your_webhook_secret
+VOICE_AI_API_KEY=your_voice_ai_api_key
+VOICE_AI_WEBHOOK_SECRET=your_webhook_secret
+VOICE_AI_BASE_URL=https://api.synthflow.ai/v2
 ```
 
-1. Log in to your [Synthflow dashboard](https://app.synthflow.ai).
-2. Find your **API Key** in your account settings and paste it after `SYNTHFLOW_API_KEY=`.
-3. If Synthflow provides a **Webhook Secret** for verifying incoming requests, paste it after `SYNTHFLOW_WEBHOOK_SECRET=`. If not, you can leave it blank.
+1. Log in to your voice AI platform dashboard (e.g., Synthflow).
+2. Find your **API Key** in your account settings and paste it after `VOICE_AI_API_KEY=`.
+3. If your platform provides a **Webhook Secret** for verifying incoming requests, paste it after `VOICE_AI_WEBHOOK_SECRET=`. If not, you can leave it blank.
+4. Update `VOICE_AI_BASE_URL` if your voice AI platform uses a different API endpoint.
 
 ### Google Calendar (Optional)
 
@@ -147,7 +155,7 @@ To get these credentials:
 
 1. Go to the [Azure Portal](https://portal.azure.com/).
 2. Navigate to **Azure Active Directory > App registrations > New registration**.
-3. Name it something like "Synthflow Calendar Booking".
+3. Name it something like "Relay Systems Calendar Booking".
 4. Under **Redirect URI**, select "Web" and enter: `http://localhost:3000/auth/microsoft/callback`
 5. Click **Register**.
 6. Copy the **Application (client) ID** — this is your `MICROSOFT_CLIENT_ID`.
@@ -187,45 +195,105 @@ After filling in the values you need, save and close the `.env` file.
    ```
 3. You should see:
    ```
-   Synthflow Calendar Booking (Multi-Tenant)
-   ──────────────────────────────────────────
-   Admin Dashboard : http://localhost:3000
-   API Base        : http://localhost:3000/api
-   Webhooks        : http://localhost:3000/webhooks/:account-slug
+   Relay Systems — Voice AI Management Platform
+   ─────────────────────────────────────────────
+   Dashboard  : http://localhost:3000
+   API Base   : http://localhost:3000/api
+   Webhooks   : http://localhost:3000/webhooks/:account-slug
    ```
 4. Open your web browser and go to **http://localhost:3000**.
-5. You should see the Admin Dashboard.
 
 To stop the application, go back to the terminal and press **Ctrl+C**.
 
 ---
 
-## 5. The Admin Dashboard
+## 5. First-Time Setup
 
-When you open the application, you'll see the **Admin Dashboard**. This is your central control panel. Here's what you'll find:
+When you open the application for the first time, you'll see the **Setup** screen instead of a login form. This is because no users exist yet — you need to create the first admin account.
+
+### Create the Admin Account
+
+1. Enter your **Full Name**.
+2. Enter your **Email Address** — this will be your login email.
+3. Enter a **Password** (minimum 6 characters).
+4. Click **Create Admin Account**.
+
+You'll be logged in automatically and taken to the Admin Dashboard.
+
+**Important:** The setup screen only appears when there are zero users in the system. After the first admin is created, all new users must be invited by an admin through the User Management page.
+
+---
+
+## 6. The Admin Dashboard
+
+After logging in as an admin, you'll see the **Admin Dashboard**. This is your central control panel.
 
 ### Sidebar Menu
 
-- **Dashboard** — Overview with stats across all your client accounts (total accounts, bookings, calendars, etc.).
-- **Accounts** — Create and manage your client sub-accounts. This is where you'll spend most of your time.
-- **All Bookings** — View every booking across all accounts in one place, with filters for account, status, and source.
-- **Service Platforms** — Future integrations with ServiceTitan, Housecall Pro, and Jobber (coming soon).
+- **Dashboard** — Overview with stats across all your client accounts.
+- **Accounts** — Create and manage your client sub-accounts.
+- **All Bookings** — View every booking across all accounts in one place.
+- **Call Logs** — View all voice agent call records with outcomes and details.
+- **Users** — Manage admin and client users, send invitations.
+- **Service Platforms** — Future integrations with ServiceTitan, Housecall Pro, and Jobber.
 - **Settings** — Global settings like your business name, default booking duration, and business hours.
 
 ### Stats Cards
 
 The top of the dashboard shows key numbers at a glance:
-- **Total Accounts** / **Active Accounts** — How many client accounts you've set up.
-- **Total Bookings** / **Confirmed** / **Cancelled** — Booking counts across all clients.
+- **Accounts** — How many client accounts exist.
+- **Users** — Total number of registered users (admin + client).
+- **Bookings** — Total bookings across all clients.
+- **Calls** — Total voice agent calls logged.
+- **Confirmed** — Bookings with confirmed status.
 - **Today** — Bookings scheduled for today.
-- **Voice AI** — Bookings created automatically by Synthflow voice agents.
+- **Cancelled** — Bookings that have been cancelled.
 - **Calendars** — Total calendar connections across all accounts.
+
+### User Info
+
+Your name and role are shown in the sidebar. Click **Sign Out** to log out.
 
 ---
 
-## 6. Creating Your First Client Account
+## 7. User Management
 
-Each of your clients gets their own **sub-account**. This keeps their calendars, bookings, and webhook URLs separate.
+Relay Systems has a role-based user system with two roles:
+
+- **Admin** — Full access to all accounts, settings, users, and data.
+- **Client** — Scoped access to only their assigned account's data (bookings, call logs, performance).
+
+### Inviting a New User
+
+1. Click **Users** in the sidebar.
+2. Click the **+ Invite User** button.
+3. Fill in the form:
+   - **Full Name** — The person's name.
+   - **Email Address** — Their login email (must be unique).
+   - **Role** — Choose "Admin" for full access or "Client" for scoped access.
+   - **Account** (client role only) — Select which sub-account this user belongs to.
+4. Click **Send Invite**.
+5. The system generates a temporary password. **Copy this password and share it securely** with the user — it is only shown once.
+
+### Managing Existing Users
+
+From the **Users** page you can:
+
+- **Edit** a user — Click the edit icon to change their name, email, role, or account assignment.
+- **Delete** a user — Click the delete icon to remove a user. You cannot delete your own account.
+
+### How Client Users Log In
+
+1. The client navigates to the application URL in their browser.
+2. They enter the email and temporary password you provided.
+3. After logging in, they see only their assigned account's dashboard with performance metrics, bookings, and call logs.
+4. They can update their name or email from the profile section.
+
+---
+
+## 8. Creating Your First Client Account
+
+Each of your clients gets their own **sub-account**. This keeps their calendars, bookings, call logs, and webhook URLs separate.
 
 ### Steps
 
@@ -236,7 +304,7 @@ Each of your clients gets their own **sub-account**. This keeps their calendars,
    - **Contact Name** — The primary contact person at this client.
    - **Contact Email** — Their email address.
    - **Contact Phone** — Their phone number.
-   - **Synthflow Agent ID** — The ID of the Synthflow voice agent assigned to this client. You can find this in your Synthflow dashboard.
+   - **Voice Agent ID** — The ID of the voice AI agent assigned to this client. You can find this in your voice AI platform dashboard.
    - **Notes** — Any internal notes for your reference.
 4. Click **Create Account**.
 
@@ -246,7 +314,7 @@ You'll be taken to the account's detail page. The system automatically generates
 
 ---
 
-## 7. Connecting a Calendar to an Account
+## 9. Connecting a Calendar to an Account
 
 Each account needs at least one calendar connected so that bookings can be created automatically.
 
@@ -288,9 +356,9 @@ If an account has multiple calendars connected, you should set one as the **defa
 
 ---
 
-## 8. Setting Up the Synthflow Webhook
+## 10. Setting Up the Voice AI Webhook
 
-This is the critical step that connects your Synthflow voice agent to this application. When a customer calls and the voice agent collects booking information, Synthflow sends that data to a webhook URL — and this app handles it.
+This is the critical step that connects your voice AI agent to this application. When a customer calls and the voice agent collects booking information, the platform sends that data to a webhook URL — and this app handles it.
 
 ### Find Your Webhook URLs
 
@@ -299,8 +367,8 @@ This is the critical step that connects your Synthflow voice agent to this appli
    - The **Overview** tab (right side, under "Webhook URLs").
    - The **Webhooks** tab (shows them prominently with a copy button).
 3. There are two URLs:
-   - **Booking Webhook** — Synthflow sends data here when a call ends and booking info was collected.
-   - **Availability Webhook** — Synthflow calls this during a live call to check available time slots.
+   - **Booking Webhook** — The voice AI platform sends data here when a call ends and booking info was collected.
+   - **Availability Webhook** — The platform calls this during a live call to check available time slots.
 
 Each URL looks something like:
 ```
@@ -308,31 +376,100 @@ http://localhost:3000/webhooks/acme-plumbing-a3f2b1
 http://localhost:3000/webhooks/acme-plumbing-a3f2b1/availability
 ```
 
-### Configure in Synthflow
+### Configure in Your Voice AI Platform
 
 1. Click the **Copy** button next to the Booking Webhook URL.
-2. Log in to your [Synthflow dashboard](https://app.synthflow.ai).
+2. Log in to your voice AI platform dashboard (e.g., Synthflow).
 3. Open the voice agent assigned to this client.
 4. In the agent's settings, find the **Webhook** or **Post-Call Webhook** configuration.
 5. Paste the **Booking Webhook URL** there.
-6. If Synthflow supports a live availability lookup (a webhook called during the call), paste the **Availability Webhook URL** in that field as well.
+6. If the platform supports a live availability lookup (a webhook called during the call), paste the **Availability Webhook URL** in that field as well.
 7. Save the agent configuration.
 
 ### How It Works
 
 Once configured, the flow is:
 
-1. A customer calls the phone number connected to the Synthflow agent.
+1. A customer calls the phone number connected to the voice AI agent.
 2. The voice agent answers and has a conversation, collecting details like the customer's name, preferred date/time, and service type.
-3. When the call ends, Synthflow sends all the extracted data to the Booking Webhook URL.
-4. This application receives that data, checks the connected calendar for conflicts, and creates a calendar event automatically.
-5. The booking appears in the dashboard under the account's Bookings tab.
+3. When the call ends, the platform sends all the extracted data to the Booking Webhook URL.
+4. This application receives that data, creates a **call log** entry with all configured variables, checks the connected calendar for conflicts, and creates a calendar event automatically.
+5. The booking appears in the dashboard under the account's Bookings tab, and the call details appear in Call Logs.
 
-**Important:** For Synthflow to reach your webhook URLs, the application must be running and accessible from the internet. See [Section 12: Deploying to the Internet](#12-deploying-to-the-internet) for instructions on making your app publicly accessible.
+**Important:** For the voice AI platform to reach your webhook URLs, the application must be running and accessible from the internet. See [Section 16: Deploying to the Internet](#16-deploying-to-the-internet) for instructions.
 
 ---
 
-## 9. Configuring Account Settings
+## 11. Call Logs and Variables
+
+Every incoming webhook call is logged with structured data. This is how you track voice agent performance.
+
+### Viewing Call Logs
+
+**As an admin:**
+1. Click **Call Logs** in the sidebar to see all calls across all accounts.
+2. Or go to an account's detail page and click the **Call Logs** tab.
+
+**As a client user:**
+1. Click **Call Logs** in the sidebar — you'll see only your account's calls.
+
+Each call log entry shows:
+- **Call ID** — Unique identifier from the voice AI platform.
+- **Date/Time** — When the call occurred.
+- **Outcome** — The result of the call (e.g., Booked, Not Booked, Callback Requested, Voicemail).
+- **Duration** — How long the call lasted.
+- **Sentiment** — The caller's detected sentiment (Positive, Neutral, Negative).
+
+Click on any call log entry to see the full detail view with all variable values and the transcript.
+
+### Call Variables
+
+Each account has a set of configurable **call variables** that define what data is captured from each voice agent call. The default variables are:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| Call Outcome | Select | Result of the call (Booked, Not Booked, Callback Requested, etc.) |
+| Call Summary | Text | Brief summary of what was discussed |
+| Transcript | Long Text | Full conversation transcript |
+| Caller Sentiment | Select | Detected sentiment (Positive, Neutral, Negative, Mixed) |
+| Call Duration | Number | Length of call in seconds |
+| Recording URL | URL | Link to the call recording |
+| Agent ID | Text | Which voice agent handled the call |
+| Call Type | Select | Inbound or Outbound |
+| Service Requested | Text | What service the caller asked about |
+| Follow-up Required | Boolean | Whether the call needs follow-up |
+
+### Customizing Call Variables (Admin Only)
+
+You can customize which variables are tracked per account:
+
+1. Go to the account's detail page.
+2. Click the **Variables** tab.
+3. Here you can:
+   - **Enable/Disable** a variable — Toggle the switch next to any variable to include or exclude it from call logs.
+   - **Remove** a variable — Click the remove button to delete a variable definition entirely.
+   - **Add a new variable** — Click **+ Add Variable** and fill in:
+     - **Key** — A unique identifier (e.g., `customer_type`). Use snake_case.
+     - **Label** — Human-readable name (e.g., "Customer Type").
+     - **Type** — Choose from: text, longtext, number, boolean, select, url.
+     - **Options** — For "select" type, enter comma-separated values (e.g., "Residential, Commercial, Emergency").
+4. Click **Save Variables** to apply changes.
+
+Changes only affect future call logs — existing logs retain their original variable values.
+
+### Performance Stats
+
+The client dashboard (and the admin account detail view) show aggregated call performance:
+
+- **Total Calls** — Number of calls logged.
+- **Booking Rate** — Percentage of calls that resulted in a booking.
+- **Avg. Duration** — Average call length.
+- **Call Outcomes** — Breakdown by outcome type (Booked, Not Booked, etc.).
+- **Sentiment** — Breakdown by caller sentiment.
+
+---
+
+## 12. Configuring Account Settings
 
 Each account can have its own business hours and booking preferences.
 
@@ -358,7 +495,7 @@ There are also global settings that apply as defaults for all accounts:
 
 ---
 
-## 10. Managing Bookings
+## 13. Managing Bookings
 
 ### Viewing Bookings
 
@@ -398,19 +535,50 @@ If you need to add a booking by hand (not from a voice call):
 
 ---
 
-## 11. Editing and Deleting Accounts
+## 14. The Client Dashboard
+
+When a client user logs in, they see a simplified dashboard focused on their account's performance.
+
+### What Client Users See
+
+**Dashboard page:**
+- **Stat cards:** Total Bookings, Confirmed, Today, Total Calls, Booking Rate, Avg. Duration.
+- **Call Outcomes chart:** Breakdown of call results (Booked, Not Booked, Callback Requested, etc.).
+- **Sentiment breakdown:** How callers felt during calls (Positive, Neutral, Negative).
+- **Recent Bookings:** The latest bookings for their account.
+
+**Bookings page:**
+- List of all bookings for their account with status, date, and source.
+
+**Call Logs page:**
+- List of all voice agent calls for their account.
+- Click any call to see full details including all variable values and transcript.
+
+### What Client Users Cannot See
+
+Client users do **not** have access to:
+- Other accounts' data
+- User management
+- Global settings
+- Webhook configuration
+- Call variable configuration (admin only)
+- Service platform settings
+
+---
+
+## 15. Editing and Deleting Accounts
 
 ### Editing an Account
 
 1. Go to the account's detail page.
 2. Click the **Edit Account** button in the top-right.
-3. Update any fields — name, contact info, Synthflow Agent ID, status, or notes.
+3. Update any fields — name, contact info, Voice Agent ID, status, or notes.
 4. To temporarily disable an account, change the **Status** to "Inactive". Inactive accounts won't process incoming webhooks.
 5. Click **Save Changes**.
 
 ### Deleting an Account
 
-**Warning:** Deleting an account permanently removes all of its data — bookings, calendar connections, webhook logs, and settings.
+**Warning:** Deleting an account permanently removes all of its data — bookings, calendar connections, call logs, webhook logs, users assigned to this account, and settings.
 
 1. Go to the account's detail page.
 2. Click **Edit Account**.
@@ -419,9 +587,9 @@ If you need to add a booking by hand (not from a voice call):
 
 ---
 
-## 12. Deploying to the Internet
+## 16. Deploying to the Internet
 
-For Synthflow's servers to send webhook data to your application, it must be accessible from the internet — not just your local computer. Here are your options:
+For your voice AI platform to send webhook data to your application, it must be accessible from the internet — not just your local computer. Here are your options:
 
 ### Option A: Using a Cloud Hosting Service
 
@@ -438,10 +606,11 @@ General steps for any platform:
 2. Sign up for the hosting service.
 3. Connect your GitHub repository.
 4. Set your environment variables (everything from your `.env` file) in the hosting service's dashboard. **Do not upload your `.env` file to GitHub** — it contains secrets.
-5. Update the `APP_URL` environment variable to your new public URL (e.g., `https://your-app-name.railway.app`).
-6. Update `GOOGLE_REDIRECT_URI` and `MICROSOFT_REDIRECT_URI` to use your public URL as well.
-7. Deploy. The service will run `npm install` and `npm start` automatically.
-8. Go back to your Synthflow agent configurations and update the webhook URLs to use your new public domain.
+5. **Important:** Set `JWT_SECRET` to a strong random string in production.
+6. Update the `APP_URL` environment variable to your new public URL (e.g., `https://your-app-name.railway.app`).
+7. Update `GOOGLE_REDIRECT_URI` and `MICROSOFT_REDIRECT_URI` to use your public URL as well.
+8. Deploy. The service will run `npm install` and `npm start` automatically.
+9. Go back to your voice AI agent configurations and update the webhook URLs to use your new public domain.
 
 ### Option B: Using ngrok for Testing
 
@@ -454,7 +623,7 @@ If you just want to test quickly without a full deployment:
    ngrok http 3000
    ```
 4. ngrok will give you a public URL like `https://abc123.ngrok.io`.
-5. Use that URL in your Synthflow webhook settings temporarily.
+5. Use that URL in your voice AI webhook settings temporarily.
 
 **Note:** ngrok URLs change every time you restart it (unless you have a paid plan), so this is for testing only.
 
@@ -464,20 +633,20 @@ Once your app is live on the internet:
 
 1. Update the `APP_URL` in your hosting environment variables to your public URL.
 2. Update the OAuth redirect URIs in your Google Cloud Console and Azure Portal to include the new domain.
-3. Each account's webhook URLs will automatically reflect the new `APP_URL`. You may need to re-copy them into your Synthflow agent settings.
+3. Each account's webhook URLs will automatically reflect the new `APP_URL`. You may need to re-copy them into your voice AI agent settings.
 
 ---
 
-## 13. Frequently Asked Questions
+## 17. Frequently Asked Questions
 
 ### "I created an account but I don't see any bookings coming in."
 
 Check the following:
 1. Is a calendar connected to the account? Go to the account's **Calendars** tab and verify.
-2. Is the webhook URL configured correctly in Synthflow? Go to the account's **Webhooks** tab, copy the URL, and double-check it matches what's in your Synthflow agent settings.
-3. Is the application accessible from the internet? Synthflow can't reach `localhost` — you need a public URL (see Section 12).
+2. Is the webhook URL configured correctly in your voice AI platform? Go to the account's **Webhooks** tab, copy the URL, and double-check it matches what's in your agent settings.
+3. Is the application accessible from the internet? Your voice AI platform can't reach `localhost` — you need a public URL (see Section 16).
 4. Is the account status set to "Active"? Inactive accounts reject webhook calls.
-5. Check the **Webhooks** tab for the account — if Synthflow is reaching your app, you'll see logged events there even if the booking itself failed.
+5. Check the **Webhooks** tab for the account — if the platform is reaching your app, you'll see logged events there even if the booking itself failed.
 
 ### "The Google/Outlook sign-in page shows an error."
 
@@ -493,9 +662,21 @@ Yes. Each account's calendar connection is independent. Two accounts could conne
 
 The application checks the connected calendar for existing events before creating a booking. If the requested time slot is already taken, it will attempt to find the nearest available slot based on the account's business hours and buffer settings.
 
-### "Can I use this without Synthflow?"
+### "Can I use this without a voice AI platform?"
 
-Yes. You can create **manual bookings** through the dashboard for any account. The manual bookings will also be added to the connected calendar. The Synthflow integration is for automating bookings from voice calls, but the dashboard works independently.
+Yes. You can create **manual bookings** through the dashboard for any account. The manual bookings will also be added to the connected calendar. The voice AI integration is for automating bookings from voice calls, but the dashboard works independently.
+
+### "How do I invite a client to view their dashboard?"
+
+1. Create their sub-account first (Section 8).
+2. Go to **Users** in the sidebar and click **+ Invite User**.
+3. Set the role to **Client** and select their account.
+4. Share the temporary password with them securely.
+5. They can log in and see their bookings, call logs, and performance metrics.
+
+### "Can a client user modify their call variable settings?"
+
+No. Call variable configuration is admin-only. Client users can view call log data but cannot change which variables are tracked.
 
 ### "Where is the data stored?"
 
@@ -504,8 +685,10 @@ All data is stored in JSON files in the `data/` folder inside the application di
 - `bookings.json` — All bookings.
 - `calendars.json` — Calendar connection details.
 - `settings.json` — Global settings.
-- `account_settings.json` — Per-account settings.
+- `account_settings.json` — Per-account settings (including call variable definitions).
 - `webhook_logs.json` — Incoming webhook event logs.
+- `users.json` — User accounts and credentials.
+- `call_logs.json` — Voice agent call records with variable data.
 
 For a production deployment with many accounts and bookings, you may want to migrate to a database. The JSON file storage works well for small-to-medium usage.
 

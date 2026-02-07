@@ -1,40 +1,40 @@
 const express = require('express');
+const { v4: uuidv4 } = require('uuid');
 const router = express.Router();
-const synthflow = require('../services/synthflow');
+const voiceAiService = require('../services/voice-ai');
 const bookingService = require('../services/booking');
 const availability = require('../services/availability');
 const store = require('../services/store');
 
 /**
  * POST /webhooks/:slug
- * Per-account webhook endpoint — Synthflow sends call data here when a voice
- * agent completes a call that includes a booking intent.
- * The slug identifies which sub-account this webhook belongs to.
+ * Per-account webhook endpoint — voice AI platform sends call data here
+ * when a voice agent completes a call.
+ * Creates a call log entry with all configured variables, and attempts
+ * a booking if booking-related data was extracted.
  */
 router.post('/:slug', async (req, res) => {
   try {
-    // Look up the account by slug
     const account = store.getAccountBySlug(req.params.slug);
     if (!account) {
       return res.status(404).json({ error: 'Account not found for this webhook URL' });
     }
-
     if (account.status !== 'active') {
       return res.status(403).json({ error: 'Account is not active' });
     }
 
     // Verify webhook authenticity
-    const signature = req.headers['x-synthflow-signature'] || req.headers['x-webhook-signature'] || '';
+    const signature = req.headers['x-relay-signature'] || req.headers['x-synthflow-signature'] || req.headers['x-webhook-signature'] || '';
     const rawBody = JSON.stringify(req.body);
-    if (synthflow.webhookSecret && !synthflow.verifyWebhookSignature(rawBody, signature)) {
+    if (voiceAiService.webhookSecret && !voiceAiService.verifyWebhookSignature(rawBody, signature)) {
       return res.status(401).json({ error: 'Invalid webhook signature' });
     }
 
-    // Log the webhook with accountId
+    // Log the raw webhook event
     store.addWebhookLog({
       id: Date.now().toString(),
       accountId: account.id,
-      provider: 'synthflow',
+      provider: 'voice_ai',
       event: req.body.event || req.body.call_status || 'unknown',
       callId: req.body.call_id,
       timestamp: new Date().toISOString(),
@@ -45,25 +45,51 @@ router.post('/:slug', async (req, res) => {
 
     const eventType = req.body.event || '';
 
-    // Handle different Synthflow event types
-    if (eventType === 'call.completed' || eventType === 'call.ended' || req.body.extracted_data) {
-      const bookingRequest = synthflow.parseBookingRequest(req.body);
+    // Parse the incoming payload
+    const parsed = voiceAiService.parseCallData(req.body);
 
-      // Only attempt booking if the agent extracted booking-related data
+    // Build the call log entry with account-specific variables
+    const settings = store.getAccountSettings(account.id);
+    const variableDefs = settings.callVariables || [];
+    const callVariables = {};
+
+    for (const def of variableDefs) {
+      if (!def.enabled) continue;
+      callVariables[def.key] = parsed[def.key] !== undefined ? parsed[def.key] : null;
+    }
+
+    // Create the call log
+    const callLog = {
+      id: uuidv4(),
+      accountId: account.id,
+      callId: parsed.sourceCallId || req.body.call_id,
+      agentId: parsed.agentId,
+      callerPhone: parsed.callerPhone,
+      variables: callVariables,
+      rawPayload: req.body,
+      timestamp: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+    store.addCallLog(callLog);
+
+    // Handle booking events
+    if (eventType === 'call.completed' || eventType === 'call.ended' || req.body.extracted_data) {
+      const bookingRequest = voiceAiService.parseBookingRequest(req.body);
+
       if (bookingRequest.customerName || bookingRequest.preferredDate || bookingRequest.serviceType) {
         const result = await bookingService.processVoiceBooking(account.id, bookingRequest);
 
         return res.json({
           status: result.success ? 'booked' : 'failed',
           booking: result.booking || null,
+          callLogId: callLog.id,
           error: result.error || null,
           alternatives: result.alternativeSlots || null,
         });
       }
     }
 
-    // Acknowledge non-booking events
-    res.json({ status: 'received', message: 'Event logged' });
+    res.json({ status: 'received', callLogId: callLog.id, message: 'Call logged' });
   } catch (err) {
     console.error('Webhook processing error:', err);
     res.status(500).json({ error: 'Internal processing error' });
@@ -72,17 +98,14 @@ router.post('/:slug', async (req, res) => {
 
 /**
  * POST /webhooks/:slug/availability
- * Called by Synthflow during a live call to check availability for an account
- * so the agent can offer slots to the caller in real time.
+ * Called during a live call to check availability for an account.
  */
 router.post('/:slug/availability', async (req, res) => {
   try {
-    // Look up the account by slug
     const account = store.getAccountBySlug(req.params.slug);
     if (!account) {
       return res.status(404).json({ error: 'Account not found for this webhook URL' });
     }
-
     if (account.status !== 'active') {
       return res.status(403).json({ error: 'Account is not active' });
     }
@@ -90,13 +113,11 @@ router.post('/:slug/availability', async (req, res) => {
     console.log(`[Account ${account.id}] Availability check requested`);
 
     const { date, duration } = req.body;
-
     if (date) {
       const result = await availability.getAvailableSlots(account.id, date, duration);
       return res.json(result);
     }
 
-    // No date specified — find the next available
     const next = await availability.findNextAvailable(account.id, duration);
     res.json(next || { slots: [], message: 'No availability found' });
   } catch (err) {
@@ -107,7 +128,7 @@ router.post('/:slug/availability', async (req, res) => {
 
 /**
  * GET /webhooks/logs/all
- * Admin view of all webhook logs across all accounts.
+ * Admin view of all webhook logs.
  */
 router.get('/logs/all', (req, res) => {
   const logs = store.getWebhookLogs();

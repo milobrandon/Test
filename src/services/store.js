@@ -4,7 +4,8 @@ const config = require('../config');
 
 /**
  * Multi-tenant JSON file-backed data store.
- * All bookings, calendars, and settings are scoped by accountId.
+ * All bookings, calendars, call logs, and settings are scoped by accountId.
+ * Users are centrally managed with role-based access.
  */
 class Store {
   constructor() {
@@ -30,6 +31,48 @@ class Store {
 
   write(name, data) {
     fs.writeFileSync(this.filePath(name), JSON.stringify(data, null, 2));
+  }
+
+  // ─── Users (centralized user management) ──────────────────
+
+  getUsers() {
+    return this.read('users', []);
+  }
+
+  getUserById(id) {
+    return this.getUsers().find((u) => u.id === id) || null;
+  }
+
+  getUserByEmail(email) {
+    return this.getUsers().find((u) => u.email.toLowerCase() === email.toLowerCase()) || null;
+  }
+
+  getUsersByAccountId(accountId) {
+    return this.getUsers().filter((u) => u.accountId === accountId);
+  }
+
+  addUser(user) {
+    const users = this.getUsers();
+    users.push(user);
+    this.write('users', users);
+    return user;
+  }
+
+  updateUser(id, updates) {
+    const users = this.getUsers();
+    const idx = users.findIndex((u) => u.id === id);
+    if (idx === -1) return null;
+    users[idx] = { ...users[idx], ...updates, updatedAt: new Date().toISOString() };
+    this.write('users', users);
+    return users[idx];
+  }
+
+  deleteUser(id) {
+    const users = this.getUsers();
+    const filtered = users.filter((u) => u.id !== id);
+    if (filtered.length === users.length) return false;
+    this.write('users', filtered);
+    return true;
   }
 
   // ─── Accounts (sub-accounts for clients) ──────────────────
@@ -67,10 +110,13 @@ class Store {
     const filtered = accounts.filter((a) => a.id !== id);
     if (filtered.length === accounts.length) return false;
     this.write('accounts', filtered);
-    // Also clean up related data
+    // Clean up related data
     this.write('bookings', this.read('bookings', []).filter((b) => b.accountId !== id));
     this.write('calendars', this.read('calendars', []).filter((c) => c.accountId !== id));
     this.write('webhook_logs', this.read('webhook_logs', []).filter((l) => l.accountId !== id));
+    this.write('call_logs', this.read('call_logs', []).filter((l) => l.accountId !== id));
+    // Remove users associated with this account (not admin users)
+    this.write('users', this.getUsers().filter((u) => u.accountId !== id));
     return true;
   }
 
@@ -144,7 +190,35 @@ class Store {
     return true;
   }
 
-  // ─── Per-account settings ─────────────────────────────────
+  // ─── Call Logs (voice agent call data, scoped by accountId) ─
+
+  getCallLogs(accountId) {
+    const all = this.read('call_logs', []);
+    return accountId ? all.filter((l) => l.accountId === accountId) : all;
+  }
+
+  getCallLogById(id) {
+    return this.read('call_logs', []).find((l) => l.id === id) || null;
+  }
+
+  addCallLog(log) {
+    const logs = this.read('call_logs', []);
+    logs.unshift(log);
+    if (logs.length > 2000) logs.length = 2000;
+    this.write('call_logs', logs);
+    return log;
+  }
+
+  updateCallLog(id, updates) {
+    const logs = this.read('call_logs', []);
+    const idx = logs.findIndex((l) => l.id === id);
+    if (idx === -1) return null;
+    logs[idx] = { ...logs[idx], ...updates, updatedAt: new Date().toISOString() };
+    this.write('call_logs', logs);
+    return logs[idx];
+  }
+
+  // ─── Per-account settings (includes call variable definitions) ─
 
   getAccountSettings(accountId) {
     const all = this.read('account_settings', {});
@@ -157,6 +231,7 @@ class Store {
       enabledProviders: ['google', 'microsoft', 'caldav'],
       enabledServicePlatforms: [],
       notifications: { emailOnBooking: true, emailOnCancellation: true },
+      callVariables: config.defaultCallVariables,
     };
   }
 
@@ -171,7 +246,7 @@ class Store {
 
   getSettings() {
     return this.read('settings', {
-      businessName: 'My Business',
+      businessName: 'Relay Systems',
       defaultCalendarProvider: 'google',
       defaultCalendarId: '',
       defaultDuration: config.booking.defaultDurationMinutes,

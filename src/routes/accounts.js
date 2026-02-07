@@ -41,11 +41,11 @@ router.get('/:id', (req, res) => {
 /**
  * POST /api/accounts
  * Create a new sub-account.
- * Fields: name, contactName, contactEmail, contactPhone, synthflowAgentId, notes
+ * Fields: name, contactName, contactEmail, contactPhone, voiceAgentId, notes
  * Generates: slug, webhookUrl
  */
 router.post('/', (req, res) => {
-  const { name, contactName, contactEmail, contactPhone, synthflowAgentId, notes } = req.body;
+  const { name, contactName, contactEmail, contactPhone, voiceAgentId, notes } = req.body;
   if (!name) return res.status(400).json({ error: 'Account name is required' });
 
   // Generate a URL-safe slug for webhook routing
@@ -59,7 +59,7 @@ router.post('/', (req, res) => {
     contactName: contactName || '',
     contactEmail: contactEmail || '',
     contactPhone: contactPhone || '',
-    synthflowAgentId: synthflowAgentId || '',
+    voiceAgentId: voiceAgentId || '',
     notes: notes || '',
     status: 'active',
     webhookUrl: `${config.appUrl}/webhooks/${slug}`,
@@ -77,13 +77,13 @@ router.post('/', (req, res) => {
  * Update an existing sub-account.
  */
 router.put('/:id', (req, res) => {
-  const { name, contactName, contactEmail, contactPhone, synthflowAgentId, notes, status } = req.body;
+  const { name, contactName, contactEmail, contactPhone, voiceAgentId, notes, status } = req.body;
   const updates = {};
   if (name !== undefined) updates.name = name;
   if (contactName !== undefined) updates.contactName = contactName;
   if (contactEmail !== undefined) updates.contactEmail = contactEmail;
   if (contactPhone !== undefined) updates.contactPhone = contactPhone;
-  if (synthflowAgentId !== undefined) updates.synthflowAgentId = synthflowAgentId;
+  if (voiceAgentId !== undefined) updates.voiceAgentId = voiceAgentId;
   if (notes !== undefined) updates.notes = notes;
   if (status !== undefined) updates.status = status;
 
@@ -119,7 +119,7 @@ router.get('/:id/stats', (req, res) => {
     confirmedBookings: bookings.filter((b) => b.status === 'confirmed').length,
     cancelledBookings: bookings.filter((b) => b.status === 'cancelled').length,
     todayBookings: bookings.filter((b) => b.date === today).length,
-    voiceBookings: bookings.filter((b) => b.source === 'synthflow').length,
+    voiceBookings: bookings.filter((b) => b.source === 'voice_ai').length,
     manualBookings: bookings.filter((b) => b.source === 'manual').length,
     connectedCalendars: calendars.length,
     calendarProviders: [...new Set(calendars.map((c) => c.provider))],

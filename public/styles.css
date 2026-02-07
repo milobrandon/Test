@@ -963,6 +963,124 @@ tbody tr.clickable {
   gap: 8px;
 }
 
+/* ─── Auth Screen ────────────────────────────────────────── */
+.auth-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--sidebar-bg);
+}
+
+.auth-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.auth-brand {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.auth-brand h1 {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.auth-brand p {
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+.auth-error {
+  background: #fde8e8;
+  color: var(--danger);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* ─── Call Variable Tags ─────────────────────────────────── */
+.var-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 12px;
+  margin: 2px 4px 2px 0;
+}
+
+.var-tag.disabled {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/* ─── User Role Badges ───────────────────────────────────── */
+.badge-admin {
+  background: #ede7f6;
+  color: #6c5ce7;
+}
+
+.badge-client {
+  background: #e0f7fa;
+  color: #00838f;
+}
+
+/* ─── Performance Metric ─────────────────────────────────── */
+.perf-metric {
+  text-align: center;
+  padding: 16px;
+}
+
+.perf-metric .perf-value {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.perf-metric .perf-label {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Call Log Variable Display ──────────────────────────── */
+.var-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.var-item {
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+}
+
+.var-item-label {
+  font-size: 11px;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+
+.var-item-value {
+  font-size: 14px;
+  font-weight: 500;
+  word-break: break-word;
+}
+
 /* ─── Responsive ─────────────────────────────────────────── */
 @media (max-width: 900px) {
   .sidebar {

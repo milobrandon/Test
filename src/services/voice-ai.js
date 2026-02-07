@@ -1,28 +1,75 @@
 const crypto = require('crypto');
 const config = require('../config');
 
-class SynthflowService {
+/**
+ * Voice AI service — handles webhook verification, payload parsing,
+ * and API communication with the voice AI platform (e.g., Synthflow).
+ * Abstracted so the platform can be swapped without touching other code.
+ */
+class VoiceAiService {
   constructor() {
-    this.apiKey = config.synthflow.apiKey;
-    this.baseUrl = config.synthflow.baseUrl;
-    this.webhookSecret = config.synthflow.webhookSecret;
+    this.apiKey = config.voiceAi.apiKey;
+    this.baseUrl = config.voiceAi.baseUrl;
+    this.webhookSecret = config.voiceAi.webhookSecret;
   }
 
   /**
-   * Verify that an incoming webhook request is genuinely from Synthflow.
+   * Verify that an incoming webhook request is authentic.
    */
   verifyWebhookSignature(payload, signature) {
-    if (!this.webhookSecret) return true; // skip if no secret configured
+    if (!this.webhookSecret) return true;
     const expected = crypto
       .createHmac('sha256', this.webhookSecret)
       .update(typeof payload === 'string' ? payload : JSON.stringify(payload))
       .digest('hex');
+    if (expected.length !== (signature || '').length) return false;
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature || ''));
   }
 
   /**
-   * Parse a Synthflow webhook payload into a normalized booking request.
-   * Synthflow sends call transcript data and extracted entities.
+   * Parse raw webhook payload into a flat map of all known call variables.
+   * This is used by the webhook handler to populate the call log variables
+   * based on each account's configured variable definitions.
+   */
+  parseCallData(payload) {
+    const {
+      call_id,
+      agent_id,
+      caller_number,
+      call_type,
+      transcript,
+      extracted_data,
+      call_status,
+      call_duration,
+      recording_url,
+      call_summary,
+      call_outcome,
+      sentiment,
+    } = payload;
+
+    const data = extracted_data || {};
+
+    return {
+      sourceCallId: call_id,
+      agentId: agent_id,
+      callerPhone: caller_number,
+
+      // Standard call variables
+      call_outcome: call_outcome || data.call_outcome || call_status || null,
+      call_summary: call_summary || data.call_summary || data.summary || null,
+      transcript: transcript || data.transcript || null,
+      caller_sentiment: sentiment || data.sentiment || data.caller_sentiment || null,
+      call_duration: call_duration || data.call_duration || null,
+      recording_url: recording_url || data.recording_url || null,
+      agent_id: agent_id || null,
+      call_type: call_type || data.call_type || 'Inbound',
+      service_requested: data.service_type || data.service || data.service_requested || null,
+      follow_up_required: data.follow_up_required || data.follow_up || false,
+    };
+  }
+
+  /**
+   * Parse a webhook payload into a normalized booking request.
    */
   parseBookingRequest(payload) {
     const {
@@ -49,7 +96,6 @@ class SynthflowService {
       recordingUrl: recording_url,
       transcript: transcript,
 
-      // Booking details extracted by the voice agent
       customerName: data.customer_name || data.name || '',
       customerEmail: data.customer_email || data.email || '',
       customerPhone: data.customer_phone || caller_number || '',
@@ -64,7 +110,7 @@ class SynthflowService {
   }
 
   /**
-   * Call Synthflow API to list configured agents.
+   * List configured voice agents from the AI platform.
    */
   async listAgents() {
     const fetch = require('node-fetch');
@@ -74,7 +120,7 @@ class SynthflowService {
         'Content-Type': 'application/json',
       },
     });
-    if (!res.ok) throw new Error(`Synthflow API error: ${res.status}`);
+    if (!res.ok) throw new Error(`Voice AI API error: ${res.status}`);
     return res.json();
   }
 
@@ -89,13 +135,12 @@ class SynthflowService {
         'Content-Type': 'application/json',
       },
     });
-    if (!res.ok) throw new Error(`Synthflow API error: ${res.status}`);
+    if (!res.ok) throw new Error(`Voice AI API error: ${res.status}`);
     return res.json();
   }
 
   /**
-   * Send a booking confirmation back to Synthflow so the agent can
-   * relay it to the caller or trigger a follow-up action.
+   * Send a booking confirmation back to the voice AI platform.
    */
   async sendBookingConfirmation(callId, bookingDetails) {
     const fetch = require('node-fetch');
@@ -119,10 +164,10 @@ class SynthflowService {
       }),
     });
     if (!res.ok) {
-      console.error(`Failed to send confirmation to Synthflow: ${res.status}`);
+      console.error(`Failed to send confirmation to voice AI platform: ${res.status}`);
     }
     return res.ok;
   }
 }
 
-module.exports = new SynthflowService();
+module.exports = new VoiceAiService();

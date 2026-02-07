@@ -5,11 +5,11 @@ const availability = require('./availability');
 const googleCalendar = require('./google-calendar');
 const outlookService = require('./outlook');
 const caldavService = require('./caldav');
-const synthflow = require('./synthflow');
+const voiceAi = require('./voice-ai');
 
 class BookingService {
   /**
-   * Process a booking request that originated from a Synthflow voice call,
+   * Process a booking request that originated from a voice AI call,
    * scoped to a specific account.
    */
   async processVoiceBooking(accountId, bookingRequest) {
@@ -61,7 +61,7 @@ class BookingService {
       notes: bookingRequest.notes,
       address: bookingRequest.address,
       urgency: bookingRequest.urgency,
-      source: 'synthflow',
+      source: 'voice_ai',
       sourceCallId: bookingRequest.sourceCallId,
       agentId: bookingRequest.agentId,
       calendarProvider: settings.defaultCalendarProvider,
@@ -85,12 +85,12 @@ class BookingService {
     // 5. Save the booking
     store.addBooking(booking);
 
-    // 6. Notify Synthflow of the confirmation
+    // 6. Notify voice AI platform of the confirmation
     if (bookingRequest.sourceCallId) {
       try {
-        await synthflow.sendBookingConfirmation(bookingRequest.sourceCallId, booking);
+        await voiceAi.sendBookingConfirmation(bookingRequest.sourceCallId, booking);
       } catch (err) {
-        console.error(`[Account ${accountId}] Failed to notify Synthflow:`, err.message);
+        console.error(`[Account ${accountId}] Failed to notify voice AI platform:`, err.message);
       }
     }
 
@@ -119,7 +119,7 @@ class BookingService {
         `Service: ${booking.serviceType}`,
         booking.address ? `Address: ${booking.address}` : '',
         booking.notes ? `Notes: ${booking.notes}` : '',
-        `Booked via Synthflow Voice AI (Call ID: ${booking.sourceCallId || 'N/A'})`,
+        `Booked via Relay Systems Voice AI (Call ID: ${booking.sourceCallId || 'N/A'})`,
       ].filter(Boolean).join('\n'),
       startTime: booking.startTime,
       endTime: booking.endTime,
