@@ -37,7 +37,7 @@ class HousecallProProvider extends BaseProvider {
       scheduled_end: booking.endTime,
       description: `${booking.serviceType} — ${booking.customerName}\n${booking.notes || ''}`,
       address: booking.address || '',
-      tags: ['synthflow-booking'],
+      tags: ['relay-systems-booking'],
     };
 
     const res = await fetch(`${this.baseUrl}/jobs`, {

@@ -1,20 +1,20 @@
 {
-  "name": "synthflow-calendar-booking",
-  "version": "1.0.0",
-  "description": "Integrate Synthflow Voice AI agents with calendar and scheduling platforms for automatic booking",
+  "name": "relay-systems",
+  "version": "2.0.0",
+  "description": "Relay Systems — Voice AI agent management platform with calendar booking, user management, and call analytics",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
   },
   "keywords": [
-    "synthflow",
+    "relay-systems",
     "voice-ai",
     "calendar",
     "booking",
-    "google-calendar",
-    "outlook",
-    "scheduling",
+    "call-analytics",
+    "user-management",
+    "multi-tenant",
     "servicetitan",
     "housecall-pro",
     "jobber"

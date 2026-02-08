@@ -142,9 +142,35 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .topbar h1 {
   font-size: 20px;
   font-weight: 600;
+}
+
+.breadcrumb {
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.breadcrumb a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .content {
@@ -231,6 +257,97 @@ body {
   gap: 20px;
 }
 
+/* ─── Account Cards ─────────────────────────────────────── */
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.account-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.account-card:hover {
+  border-color: var(--primary-light);
+  box-shadow: var(--shadow-md);
+}
+
+.account-card.inactive {
+  opacity: 0.6;
+}
+
+.account-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.account-card-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.account-card-stats {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.account-card-stat {
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.account-card-stat strong {
+  color: var(--text);
+  display: block;
+  font-size: 18px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.account-contact {
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+/* ─── Tabs ───────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 20px;
+  gap: 0;
+}
+
+.tab {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-light);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: var(--transition);
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
 /* ─── Tables ─────────────────────────────────────────────── */
 .table-wrap {
   overflow-x: auto;
@@ -264,6 +381,10 @@ tbody tr:hover {
   background: var(--bg);
 }
 
+tbody tr.clickable {
+  cursor: pointer;
+}
+
 /* ─── Badges ─────────────────────────────────────────────── */
 .badge {
   display: inline-block;
@@ -284,7 +405,7 @@ tbody tr:hover {
   color: #d63031;
 }
 
-.badge-pending {
+.badge-pending, .badge-pending_calendar {
   background: #fef9e7;
   color: #d4a017;
 }
@@ -297,6 +418,16 @@ tbody tr:hover {
 .badge-manual {
   background: #e0f7fa;
   color: #00838f;
+}
+
+.badge-active {
+  background: #e6f9f0;
+  color: #00b894;
+}
+
+.badge-inactive {
+  background: #fde8e8;
+  color: #d63031;
 }
 
 .badge-google {
@@ -328,6 +459,7 @@ tbody tr:hover {
   transition: var(--transition);
   font-family: inherit;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .btn-primary {
@@ -796,6 +928,159 @@ tbody tr:hover {
   align-items: center;
 }
 
+/* ─── Info Box ───────────────────────────────────────────── */
+.info-box {
+  background: #f0ecff;
+  border: 1px solid var(--primary-light);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--primary-dark);
+  margin-bottom: 16px;
+}
+
+/* ─── Detail Header ─────────────────────────────────────── */
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.detail-header-info h2 {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.detail-header-info p {
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+.detail-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ─── Auth Screen ────────────────────────────────────────── */
+.auth-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--sidebar-bg);
+}
+
+.auth-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.auth-brand {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.auth-brand h1 {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.auth-brand p {
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+.auth-error {
+  background: #fde8e8;
+  color: var(--danger);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* ─── Call Variable Tags ─────────────────────────────────── */
+.var-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 12px;
+  margin: 2px 4px 2px 0;
+}
+
+.var-tag.disabled {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/* ─── User Role Badges ───────────────────────────────────── */
+.badge-admin {
+  background: #ede7f6;
+  color: #6c5ce7;
+}
+
+.badge-client {
+  background: #e0f7fa;
+  color: #00838f;
+}
+
+/* ─── Performance Metric ─────────────────────────────────── */
+.perf-metric {
+  text-align: center;
+  padding: 16px;
+}
+
+.perf-metric .perf-value {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.perf-metric .perf-label {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Call Log Variable Display ──────────────────────────── */
+.var-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.var-item {
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+}
+
+.var-item-label {
+  font-size: 11px;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+
+.var-item-value {
+  font-size: 14px;
+  font-weight: 500;
+  word-break: break-word;
+}
+
 /* ─── Responsive ─────────────────────────────────────────── */
 @media (max-width: 900px) {
   .sidebar {
@@ -822,6 +1107,10 @@ tbody tr:hover {
   }
 
   .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .account-grid {
     grid-template-columns: 1fr;
   }
 }

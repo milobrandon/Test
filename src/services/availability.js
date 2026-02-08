@@ -16,8 +16,8 @@ class AvailabilityService {
   /**
    * Generate all possible slots for a given date based on business hours.
    */
-  generateSlots(date, durationMinutes, bufferMinutes) {
-    const bh = config.booking.businessHours;
+  generateSlots(date, durationMinutes, bufferMinutes, businessHours) {
+    const bh = businessHours || config.booking.businessHours;
     const start = this.parseTime(bh.start);
     const end = this.parseTime(bh.end);
 
@@ -42,10 +42,11 @@ class AvailabilityService {
   }
 
   /**
-   * Fetch existing events from all connected calendar providers for a given date range.
+   * Fetch existing events from all connected calendar providers for an account
+   * within a given date range.
    */
-  async fetchAllEvents(startDate, endDate) {
-    const calendars = store.getCalendars();
+  async fetchAllEvents(accountId, startDate, endDate) {
+    const calendars = store.getCalendars(accountId);
     const allEvents = [];
 
     for (const cal of calendars) {
@@ -61,7 +62,7 @@ class AvailabilityService {
         }
         allEvents.push(...events.map((e) => ({ ...e, calendarProvider: cal.provider, calendarName: cal.name })));
       } catch (err) {
-        console.error(`Error fetching events from ${cal.provider} (${cal.name}):`, err.message);
+        console.error(`[Account ${accountId}] Error fetching events from ${cal.provider} (${cal.name}):`, err.message);
       }
     }
 
@@ -83,15 +84,17 @@ class AvailabilityService {
   }
 
   /**
-   * Get available slots for a specific date.
+   * Get available slots for a specific date, scoped to an account.
    */
-  async getAvailableSlots(date, durationMinutes) {
-    const duration = durationMinutes || config.booking.defaultDurationMinutes;
-    const buffer = config.booking.bufferMinutes;
+  async getAvailableSlots(accountId, date, durationMinutes) {
+    const settings = store.getAccountSettings(accountId);
+    const duration = durationMinutes || settings.defaultDuration || config.booking.defaultDurationMinutes;
+    const buffer = settings.bufferMinutes != null ? settings.bufferMinutes : config.booking.bufferMinutes;
+    const businessHours = settings.businessHours || config.booking.businessHours;
 
     // Check that the requested date is a valid business day
     const dayOfWeek = new Date(date).getDay();
-    if (!config.booking.businessHours.workDays.includes(dayOfWeek)) {
+    if (!businessHours.workDays.includes(dayOfWeek)) {
       return { date, slots: [], message: 'Not a business day' };
     }
 
@@ -107,8 +110,8 @@ class AvailabilityService {
     const dayEnd = new Date(date);
     dayEnd.setHours(23, 59, 59, 999);
 
-    const existingEvents = await this.fetchAllEvents(dayStart.toISOString(), dayEnd.toISOString());
-    const allSlots = this.generateSlots(date, duration, buffer);
+    const existingEvents = await this.fetchAllEvents(accountId, dayStart.toISOString(), dayEnd.toISOString());
+    const allSlots = this.generateSlots(date, duration, buffer, businessHours);
 
     const available = allSlots.filter((slot) => !this.hasConflict(slot, existingEvents));
 
@@ -127,17 +130,18 @@ class AvailabilityService {
   }
 
   /**
-   * Find the next available slot across upcoming days.
+   * Find the next available slot across upcoming days, scoped to an account.
    */
-  async findNextAvailable(durationMinutes, maxDaysToSearch = 14) {
-    const duration = durationMinutes || config.booking.defaultDurationMinutes;
+  async findNextAvailable(accountId, durationMinutes, maxDaysToSearch = 14) {
+    const settings = store.getAccountSettings(accountId);
+    const duration = durationMinutes || settings.defaultDuration || config.booking.defaultDurationMinutes;
 
     for (let i = 0; i < maxDaysToSearch; i++) {
       const date = new Date();
       date.setDate(date.getDate() + i);
       const dateStr = date.toISOString().split('T')[0];
 
-      const result = await this.getAvailableSlots(dateStr, duration);
+      const result = await this.getAvailableSlots(accountId, dateStr, duration);
       if (result.slots.length > 0) {
         return { date: dateStr, slot: result.slots[0], allSlots: result.slots };
       }

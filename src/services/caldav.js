@@ -75,7 +75,7 @@ class CalDAVService {
    * Build an iCalendar (ICS) event string.
    */
   buildICS(eventData) {
-    const uid = eventData.id || `${Date.now()}@synthflow-booking`;
+    const uid = eventData.id || `${Date.now()}@relay-systems-booking`;
     const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
     const dtStart = new Date(eventData.startTime).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
     const dtEnd = new Date(eventData.endTime).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
@@ -83,7 +83,7 @@ class CalDAVService {
     return [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//SynthflowBooking//EN',
+      'PRODID:-//RelaySystemsBooking//EN',
       'BEGIN:VEVENT',
       `UID:${uid}`,
       `DTSTAMP:${now}`,
@@ -102,7 +102,7 @@ class CalDAVService {
    * Create a new event on a CalDAV calendar.
    */
   async createEvent(calendarPath, eventData) {
-    const uid = eventData.id || `${Date.now()}@synthflow-booking`;
+    const uid = eventData.id || `${Date.now()}@relay-systems-booking`;
     const url = `${this.serverUrl}${calendarPath}${uid}.ics`;
     const ics = this.buildICS({ ...eventData, id: uid });
 

@@ -5,25 +5,25 @@ const availability = require('./availability');
 const googleCalendar = require('./google-calendar');
 const outlookService = require('./outlook');
 const caldavService = require('./caldav');
-const synthflow = require('./synthflow');
+const voiceAi = require('./voice-ai');
 
 class BookingService {
   /**
-   * Process a booking request that originated from a Synthflow voice call.
-   * This is the main orchestration method.
+   * Process a booking request that originated from a voice AI call,
+   * scoped to a specific account.
    */
-  async processVoiceBooking(bookingRequest) {
-    const settings = store.getSettings();
+  async processVoiceBooking(accountId, bookingRequest) {
+    const settings = store.getAccountSettings(accountId);
 
     // 1. Determine the date and time
     let targetDate = bookingRequest.preferredDate;
     let targetTime = bookingRequest.preferredTime;
-    const duration = bookingRequest.duration || settings.defaultDuration;
+    const duration = bookingRequest.duration || settings.defaultDuration || config.booking.defaultDurationMinutes;
 
     // 2. If no specific date/time, find the next available slot
     let slot;
     if (!targetDate || !targetTime) {
-      const next = await availability.findNextAvailable(duration);
+      const next = await availability.findNextAvailable(accountId, duration);
       if (!next) {
         return {
           success: false,
@@ -34,7 +34,7 @@ class BookingService {
       targetDate = next.date;
     } else {
       // Verify the requested slot is actually available
-      const slotsResult = await availability.getAvailableSlots(targetDate, duration);
+      const slotsResult = await availability.getAvailableSlots(accountId, targetDate, duration);
       slot = this.findClosestSlot(slotsResult.slots, targetTime);
       if (!slot) {
         return {
@@ -48,6 +48,7 @@ class BookingService {
     // 3. Create the booking record
     const booking = {
       id: uuidv4(),
+      accountId,
       status: 'confirmed',
       customerName: bookingRequest.customerName,
       customerEmail: bookingRequest.customerEmail,
@@ -60,7 +61,7 @@ class BookingService {
       notes: bookingRequest.notes,
       address: bookingRequest.address,
       urgency: bookingRequest.urgency,
-      source: 'synthflow',
+      source: 'voice_ai',
       sourceCallId: bookingRequest.sourceCallId,
       agentId: bookingRequest.agentId,
       calendarProvider: settings.defaultCalendarProvider,
@@ -72,11 +73,11 @@ class BookingService {
 
     // 4. Create the calendar event
     try {
-      const eventResult = await this.createCalendarEvent(booking, settings);
+      const eventResult = await this.createCalendarEvent(accountId, booking, settings);
       booking.calendarEventId = eventResult.id;
       booking.calendarLink = eventResult.htmlLink || eventResult.url || null;
     } catch (err) {
-      console.error('Failed to create calendar event:', err.message);
+      console.error(`[Account ${accountId}] Failed to create calendar event:`, err.message);
       booking.status = 'pending_calendar';
       booking.calendarError = err.message;
     }
@@ -84,12 +85,12 @@ class BookingService {
     // 5. Save the booking
     store.addBooking(booking);
 
-    // 6. Notify Synthflow of the confirmation
+    // 6. Notify voice AI platform of the confirmation
     if (bookingRequest.sourceCallId) {
       try {
-        await synthflow.sendBookingConfirmation(bookingRequest.sourceCallId, booking);
+        await voiceAi.sendBookingConfirmation(bookingRequest.sourceCallId, booking);
       } catch (err) {
-        console.error('Failed to notify Synthflow:', err.message);
+        console.error(`[Account ${accountId}] Failed to notify voice AI platform:`, err.message);
       }
     }
 
@@ -97,10 +98,10 @@ class BookingService {
   }
 
   /**
-   * Create a calendar event on the configured provider.
+   * Create a calendar event on the configured provider for an account.
    */
-  async createCalendarEvent(booking, settings) {
-    const calendars = store.getCalendars();
+  async createCalendarEvent(accountId, booking, settings) {
+    const calendars = store.getCalendars(accountId);
     const targetCalendar = calendars.find(
       (c) => c.provider === settings.defaultCalendarProvider && (c.isDefault || c.calendarId === settings.defaultCalendarId)
     ) || calendars[0];
@@ -118,7 +119,7 @@ class BookingService {
         `Service: ${booking.serviceType}`,
         booking.address ? `Address: ${booking.address}` : '',
         booking.notes ? `Notes: ${booking.notes}` : '',
-        `Booked via Synthflow Voice AI (Call ID: ${booking.sourceCallId || 'N/A'})`,
+        `Booked via Relay Systems Voice AI (Call ID: ${booking.sourceCallId || 'N/A'})`,
       ].filter(Boolean).join('\n'),
       startTime: booking.startTime,
       endTime: booking.endTime,
@@ -186,11 +187,12 @@ class BookingService {
   }
 
   /**
-   * Manually create a booking (from dashboard).
+   * Manually create a booking (from dashboard), scoped to an account.
    */
-  async createManualBooking(data) {
+  async createManualBooking(accountId, data) {
     const booking = {
       id: uuidv4(),
+      accountId,
       status: 'confirmed',
       customerName: data.customerName,
       customerEmail: data.customerEmail || '',
@@ -215,12 +217,12 @@ class BookingService {
 
     if (data.createCalendarEvent !== false) {
       try {
-        const settings = store.getSettings();
-        const eventResult = await this.createCalendarEvent(booking, settings);
+        const settings = store.getAccountSettings(accountId);
+        const eventResult = await this.createCalendarEvent(accountId, booking, settings);
         booking.calendarEventId = eventResult.id;
         booking.calendarLink = eventResult.htmlLink || eventResult.url || null;
       } catch (err) {
-        console.error('Calendar event creation failed:', err.message);
+        console.error(`[Account ${accountId}] Calendar event creation failed:`, err.message);
       }
     }
 
@@ -230,6 +232,7 @@ class BookingService {
 
   /**
    * Cancel a booking and remove the calendar event.
+   * Reads the booking to determine its accountId.
    */
   async cancelBooking(bookingId) {
     const booking = store.getBookingById(bookingId);
@@ -238,7 +241,7 @@ class BookingService {
     // Attempt to remove calendar event
     if (booking.calendarEventId) {
       try {
-        const calendars = store.getCalendars();
+        const calendars = store.getCalendars(booking.accountId);
         const cal = calendars.find((c) => c.provider === booking.calendarProvider);
         if (cal) {
           if (cal.provider === 'google') {
@@ -250,7 +253,7 @@ class BookingService {
           }
         }
       } catch (err) {
-        console.error('Failed to remove calendar event:', err.message);
+        console.error(`[Account ${booking.accountId}] Failed to remove calendar event:`, err.message);
       }
     }
 

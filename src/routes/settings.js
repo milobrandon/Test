@@ -5,6 +5,7 @@ const { listProviders, testAllConnections } = require('../providers');
 
 /**
  * GET /api/settings
+ * Get global admin settings.
  */
 router.get('/', (req, res) => {
   res.json(store.getSettings());
@@ -12,6 +13,7 @@ router.get('/', (req, res) => {
 
 /**
  * PUT /api/settings
+ * Update global admin settings.
  */
 router.put('/', (req, res) => {
   const current = store.getSettings();
@@ -39,26 +41,27 @@ router.post('/providers/test', async (req, res) => {
 });
 
 /**
- * GET /api/stats
- * Dashboard statistics.
+ * GET /api/settings/stats
+ * Aggregate statistics across all accounts.
  */
 router.get('/stats', (req, res) => {
+  const accounts = store.getAccounts();
   const bookings = store.getBookings();
   const calendars = store.getCalendars();
   const today = new Date().toISOString().split('T')[0];
 
-  const stats = {
+  res.json({
+    totalAccounts: accounts.length,
+    activeAccounts: accounts.filter((a) => a.status === 'active').length,
     totalBookings: bookings.length,
     confirmedBookings: bookings.filter((b) => b.status === 'confirmed').length,
     cancelledBookings: bookings.filter((b) => b.status === 'cancelled').length,
     todayBookings: bookings.filter((b) => b.date === today).length,
-    voiceBookings: bookings.filter((b) => b.source === 'synthflow').length,
+    voiceBookings: bookings.filter((b) => b.source === 'voice_ai').length,
     manualBookings: bookings.filter((b) => b.source === 'manual').length,
     connectedCalendars: calendars.length,
     calendarProviders: [...new Set(calendars.map((c) => c.provider))],
-  };
-
-  res.json(stats);
+  });
 });
 
 module.exports = router;
